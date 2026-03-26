@@ -133,6 +133,7 @@ qwen-run -p "구조적으로 정리해줘: ..."
 ```text
 프로젝트 루트:   setup-local-llm.sh
 문서:           docs/local-llm-environment.md
+웹 배포 문서:    docs/web-deployment.md
 llama.cpp:      ~/llama.cpp/build/bin/
 모델:           ~/models/*.gguf
 ```
