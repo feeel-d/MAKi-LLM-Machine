@@ -59,6 +59,8 @@ export default function App() {
   const [models, setModels] = useState<ModelInfo[]>(DEFAULT_MODELS);
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const threadRef = useRef<HTMLElement | null>(null);
+  const autoScrollRef = useRef(true);
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? null;
@@ -88,6 +90,33 @@ export default function App() {
       setSelectedConversationId(conversations[0].id);
     }
   }, [conversations, selectedConversationId]);
+
+  useEffect(() => {
+    autoScrollRef.current = true;
+    requestAnimationFrame(() => {
+      const thread = threadRef.current;
+      if (!thread) {
+        return;
+      }
+
+      thread.scrollTop = thread.scrollHeight;
+    });
+  }, [selectedConversationId]);
+
+  useEffect(() => {
+    if (!autoScrollRef.current) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      const thread = threadRef.current;
+      if (!thread) {
+        return;
+      }
+
+      thread.scrollTop = thread.scrollHeight;
+    });
+  }, [selectedConversation?.updatedAt, isStreaming]);
 
   const pollGateway = useEffectEvent(async () => {
     if (!apiBaseUrl) {
@@ -276,6 +305,16 @@ export default function App() {
     setApiBaseUrl(endpointDraft.trim().replace(/\/$/, ''));
   }
 
+  function handleThreadScroll() {
+    const thread = threadRef.current;
+    if (!thread) {
+      return;
+    }
+
+    const distanceFromBottom = thread.scrollHeight - thread.scrollTop - thread.clientHeight;
+    autoScrollRef.current = distanceFromBottom < 96;
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -376,7 +415,7 @@ export default function App() {
           </label>
         </section>
 
-        <section className="chat-thread">
+        <section className="chat-thread" onScroll={handleThreadScroll} ref={threadRef}>
           {selectedConversation?.turns.length ? (
             selectedConversation.turns.map((turn) => (
               <article key={turn.id} className="turn">
@@ -411,6 +450,7 @@ export default function App() {
               </p>
             </div>
           )}
+          <div className="chat-thread__anchor" />
         </section>
 
         <footer className="composer">

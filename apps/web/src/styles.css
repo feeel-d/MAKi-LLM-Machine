@@ -39,13 +39,17 @@ button {
 }
 
 #root {
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .app-shell {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -56,6 +60,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .sidebar__header,
@@ -72,8 +78,11 @@ button {
 .workspace {
   padding: 28px;
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 18px;
+  min-height: 0;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .workspace__header,
@@ -175,6 +184,8 @@ p {
   gap: 10px;
   overflow: auto;
   padding-right: 4px;
+  min-height: 0;
+  flex: 1;
 }
 
 .conversation-item {
@@ -259,11 +270,19 @@ p {
 }
 
 .chat-thread {
-  overflow: auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: grid;
   gap: 20px;
   align-content: start;
-  padding-right: 4px;
+  padding: 6px 8px 18px 4px;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+
+.chat-thread__anchor {
+  height: 1px;
 }
 
 .turn {
@@ -356,6 +375,13 @@ p {
   min-height: 120px;
 }
 
+.composer {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  backdrop-filter: blur(20px);
+}
+
 .composer__actions {
   display: flex;
   gap: 12px;
@@ -364,11 +390,17 @@ p {
 @media (max-width: 1080px) {
   .app-shell {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .sidebar {
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    height: auto;
+  }
+
+  .workspace {
+    height: 100%;
   }
 }
 
