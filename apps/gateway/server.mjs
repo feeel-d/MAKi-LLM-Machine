@@ -1,4 +1,6 @@
 import http from 'node:http';
+import { readFile, stat } from 'node:fs/promises';
+import path from 'node:path';
 import { CapacityQueue } from './lib/capacity-queue.mjs';
 import { loadConfig } from './lib/config.mjs';
 import { readJsonBody, getClientIp, sendJson, setCorsHeaders } from './lib/http.mjs';
@@ -17,6 +19,9 @@ const queue = new CapacityQueue({
   capacity: config.queueCapacity,
   maxPending: config.queueMaxPending,
 });
+const repoRoot = process.cwd();
+const webBasePath = '/MAKi-LLM-Machine';
+const webDistPath = path.join(repoRoot, 'apps', 'web', 'dist');
 
 const server = http.createServer(async (request, response) => {
   setCorsHeaders(request, response, config.allowedOrigins);
@@ -43,6 +48,13 @@ const server = http.createServer(async (request, response) => {
     if (request.method === 'POST' && url.pathname === '/api/chat/stream') {
       await handleChatStream(request, response);
       return;
+    }
+
+    if (request.method === 'GET') {
+      const served = await tryServeWebApp(url.pathname, response);
+      if (served) {
+        return;
+      }
     }
 
     sendJson(response, 404, { error: 'Not found' });
@@ -181,4 +193,70 @@ async function handleChatStream(request, response) {
     request.off('close', closeHandler);
     response.end();
   }
+}
+
+async function tryServeWebApp(pathname, response) {
+  if (!(pathname === webBasePath || pathname === `${webBasePath}/` || pathname.startsWith(`${webBasePath}/`))) {
+    return false;
+  }
+
+  const relativePath = pathname.slice(webBasePath.length).replace(/^\/+/, '');
+  const safePath = relativePath.replace(/\.\./g, '');
+  const targetPath = safePath.length > 0 ? path.join(webDistPath, safePath) : path.join(webDistPath, 'index.html');
+
+  try {
+    const targetStat = await stat(targetPath);
+
+    if (targetStat.isDirectory()) {
+      const indexFile = path.join(targetPath, 'index.html');
+      await sendFile(indexFile, response);
+      return true;
+    }
+
+    await sendFile(targetPath, response);
+    return true;
+  } catch {
+    const fallbackPath = path.join(webDistPath, 'index.html');
+    try {
+      await sendFile(fallbackPath, response);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+async function sendFile(filePath, response) {
+  const content = await readFile(filePath);
+  response.writeHead(200, {
+    'Content-Type': contentTypeFor(filePath),
+    'Cache-Control': filePath.endsWith('.html') ? 'no-cache' : 'public, max-age=600',
+  });
+  response.end(content);
+}
+
+function contentTypeFor(filePath) {
+  if (filePath.endsWith('.html')) {
+    return 'text/html; charset=utf-8';
+  }
+  if (filePath.endsWith('.js')) {
+    return 'application/javascript; charset=utf-8';
+  }
+  if (filePath.endsWith('.css')) {
+    return 'text/css; charset=utf-8';
+  }
+  if (filePath.endsWith('.json')) {
+    return 'application/json; charset=utf-8';
+  }
+  if (filePath.endsWith('.svg')) {
+    return 'image/svg+xml';
+  }
+  if (filePath.endsWith('.png')) {
+    return 'image/png';
+  }
+  if (filePath.endsWith('.ico')) {
+    return 'image/x-icon';
+  }
+
+  return 'application/octet-stream';
 }
