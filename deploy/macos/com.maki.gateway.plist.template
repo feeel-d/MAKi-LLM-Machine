@@ -6,8 +6,8 @@
     <string>com.maki.gateway</string>
     <key>ProgramArguments</key>
     <array>
-      <string>/bin/zsh</string>
-      <string>__REPO_ROOT__/scripts/run-gateway.sh</string>
+      <string>__NODE_BIN__</string>
+      <string>__REPO_ROOT__/apps/gateway/server.mjs</string>
     </array>
     <key>WorkingDirectory</key>
     <string>__REPO_ROOT__</string>
@@ -23,6 +23,10 @@
     <dict>
       <key>HOME</key>
       <string>__HOME__</string>
+      <key>PATH</key>
+      <string>__PATH_FOR_LAUNCHD__</string>
+      <key>LLAMA_SERVER_URL</key>
+      <string>http://127.0.0.1:8081</string>
     </dict>
   </dict>
 </plist>

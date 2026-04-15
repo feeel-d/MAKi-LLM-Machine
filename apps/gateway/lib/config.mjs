@@ -19,7 +19,7 @@ export function loadConfig() {
   return {
     host: process.env.GATEWAY_HOST ?? '127.0.0.1',
     port: readNumber('GATEWAY_PORT', 3001),
-    llamaServerUrl: process.env.LLAMA_SERVER_URL ?? 'http://127.0.0.1:8080',
+    llamaServerUrl: process.env.LLAMA_SERVER_URL ?? 'http://127.0.0.1:8081',
     llamaApiKey: process.env.LLAMA_API_KEY ?? '',
     allowedOrigins,
     rateLimitBurst: readNumber('RATE_LIMIT_BURST', 4),

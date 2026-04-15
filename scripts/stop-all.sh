@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_DIR="${RUNTIME_DIR:-$ROOT_DIR/.runtime}"
 ROUTER_PID_FILE="$RUNTIME_DIR/router.pid"
 GATEWAY_PID_FILE="$RUNTIME_DIR/gateway.pid"
-ROUTER_PORT="${ROUTER_PORT:-8080}"
+ROUTER_PORT="${ROUTER_PORT:-8081}"
 GATEWAY_PORT="${GATEWAY_PORT:-3001}"
 
 is_pid_running() {

@@ -7,7 +7,7 @@ ROUTER_PID_FILE="$RUNTIME_DIR/router.pid"
 GATEWAY_PID_FILE="$RUNTIME_DIR/gateway.pid"
 ROUTER_LOG_FILE="$RUNTIME_DIR/router.log"
 GATEWAY_LOG_FILE="$RUNTIME_DIR/gateway.log"
-ROUTER_PORT="${ROUTER_PORT:-8080}"
+ROUTER_PORT="${ROUTER_PORT:-8081}"
 GATEWAY_PORT="${GATEWAY_PORT:-3001}"
 
 mkdir -p "$RUNTIME_DIR"
@@ -73,7 +73,8 @@ start_background() {
 start_background "router" "$ROUTER_PID_FILE" "$ROUTER_LOG_FILE" "$ROUTER_PORT" "$ROOT_DIR/scripts/run-llama-router.sh"
 wait_for_http "http://127.0.0.1:${ROUTER_PORT}/v1/models" "router"
 
-start_background "gateway" "$GATEWAY_PID_FILE" "$GATEWAY_LOG_FILE" "$GATEWAY_PORT" "$ROOT_DIR/scripts/run-gateway.sh"
+start_background "gateway" "$GATEWAY_PID_FILE" "$GATEWAY_LOG_FILE" "$GATEWAY_PORT" \
+  env LLAMA_SERVER_URL="http://127.0.0.1:${ROUTER_PORT}" "$ROOT_DIR/scripts/run-gateway.sh"
 wait_for_http "http://127.0.0.1:${GATEWAY_PORT}/api/health" "gateway"
 
 "$ROOT_DIR/scripts/start-funnel.sh"

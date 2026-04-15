@@ -6,7 +6,7 @@
     <string>com.maki.llama-router</string>
     <key>ProgramArguments</key>
     <array>
-      <string>/bin/zsh</string>
+      <string>/bin/bash</string>
       <string>__REPO_ROOT__/scripts/run-llama-router.sh</string>
     </array>
     <key>WorkingDirectory</key>
@@ -23,6 +23,10 @@
     <dict>
       <key>HOME</key>
       <string>__HOME__</string>
+      <key>PATH</key>
+      <string>__PATH_FOR_LAUNCHD__</string>
+      <key>ROUTER_PORT</key>
+      <string>8081</string>
     </dict>
   </dict>
 </plist>

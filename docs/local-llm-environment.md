@@ -143,3 +143,12 @@ llama.cpp:      ~/llama.cpp/build/bin/
 ```
 
 문제가 나면 `llama-completion` 실행에 **`-no-cnv`** 가 빠졌는지(채팅 템플릿 모델), **컨텍스트·메모리** 한계인지 순서로 확인하면 됩니다.
+
+---
+
+## 10. Mac 운영 체크 (게이트웨이·Funnel·nginx)
+
+1. **로컬 게이트웨이:** `curl -sS http://127.0.0.1:3001/api/health` → JSON에 `"status":"ok"`.
+2. **Tailscale Funnel:** `tailscale funnel --bg 3001` (`scripts/start-funnel.sh` 동일). `tailscale funnel status` 의 `https://....ts.net` 를 브라우저 Gateway URL에 넣는다 (게이트웨이 포트와 동일해야 함).
+3. **nginx가 443/80 앞단일 때:** 전역 `301` 으로 `app.markhub.ai` 등으로 몰면 GitHub Pages 프론트가 API JSON 대신 HTML/리다이렉트를 받는다. `location ^~ /api/` 는 `proxy_pass http://127.0.0.1:3001;` 로 두거나, Funnel 전용 호스트만 게이트웨이에 붙인다. 레포 참고: `deploy/macos/nginx-maki-ink-api-proxy.conf`.
+4. **라우터 포트:** 기본 `8081` (`ROUTER_PORT`). nginx·다른 서비스가 8080을 쓰는 경우와 충돌하지 않게 맞춘다. Gemma 없이 DeepSeek+Qwen만 쓰려면 `MAKI_ROUTER_PROFILE=dq2` (`scripts/run-llama-router.sh`).

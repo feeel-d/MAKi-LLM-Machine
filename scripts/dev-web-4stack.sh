@@ -7,7 +7,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_DIR="${RUNTIME_DIR:-$ROOT_DIR/.runtime}"
 MODELS_DIR="${MODELS_DIR:-$HOME/models}"
-ROUTER_PORT="${ROUTER_PORT:-8080}"
+ROUTER_PORT="${ROUTER_PORT:-8081}"
 GATEWAY_PORT="${GATEWAY_PORT:-3001}"
 
 # 부분 다운로드 방지 — 대략적 최소 크기 (Q4_K_M, bartowski 기본 기준)
@@ -85,7 +85,8 @@ done
 echo "Starting gateway on :${GATEWAY_PORT}…"
 cd "$ROOT_DIR"
 : >"$RUNTIME_DIR/gateway-dev.log"
-nohup node apps/gateway/server.mjs >>"$RUNTIME_DIR/gateway-dev.log" 2>&1 &
+nohup env LLAMA_SERVER_URL="${LLAMA_SERVER_URL:-http://127.0.0.1:${ROUTER_PORT}}" \
+  "$ROOT_DIR/scripts/run-gateway.sh" >>"$RUNTIME_DIR/gateway-dev.log" 2>&1 &
 GATEWAY_PID=$!
 
 for i in $(seq 1 60); do
