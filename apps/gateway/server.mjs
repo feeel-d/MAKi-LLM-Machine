@@ -89,9 +89,13 @@ async function handleHealth(response) {
       models: visibleModels,
     });
   } catch (error) {
-    sendJson(response, 503, {
+    // GitHub Pages 등 프론트는 fetch().ok 가 false(503)이면 “연결 실패”로만 보인다.
+    // 게이트웨이(Funnel)는 살아 있고 로컬 라우터만 죽은 경우도 200 + status 로 구분한다.
+    sendJson(response, 200, {
       status: 'degraded',
+      upstream: 'unreachable',
       error: error instanceof Error ? error.message : 'Upstream unavailable',
+      models: [],
     });
   }
 }
@@ -120,7 +124,15 @@ async function handleModels(response) {
       ],
     });
   } catch (error) {
-    sendJson(response, 503, {
+    sendJson(response, 200, {
+      data: [
+        { id: 'deepseek', label: 'DeepSeek', available: false },
+        { id: 'qwen', label: 'Qwen', available: false },
+        { id: 'all', label: 'All', available: false },
+        { id: 'gemma26', label: 'Gemma 4 26B', available: false },
+        { id: 'gemmae4', label: 'Gemma 4 E4B', available: false },
+        { id: 'gemma_all', label: 'Gemma All', available: false },
+      ],
       error: error instanceof Error ? error.message : 'Failed to fetch models',
     });
   }

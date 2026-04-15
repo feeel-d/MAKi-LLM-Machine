@@ -30,7 +30,11 @@ import type {
   Turn,
 } from './types';
 
-const DEFAULT_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/$/, '');
+function normalizeApiBaseUrl(value: string): string {
+  return value.trim().replace(/\/$/, '');
+}
+
+const DEFAULT_API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL ?? '');
 
 const MODEL_LABELS: Record<ModelKind, string> = {
   deepseek: 'DeepSeek',
@@ -87,8 +91,8 @@ export default function App() {
   const [selectedModel, setSelectedModel] = useState<ModelKind>(() => loadSelectedModel());
   const [draft, setDraft] = useState('');
   const [systemPrompt, setSystemPrompt] = useState(() => loadSystemPrompt());
-  const [apiBaseUrl, setApiBaseUrl] = useState(() => loadApiBaseUrl(DEFAULT_API_BASE_URL));
-  const [endpointDraft, setEndpointDraft] = useState(() => loadApiBaseUrl(DEFAULT_API_BASE_URL));
+  const [apiBaseUrl, setApiBaseUrl] = useState(() => normalizeApiBaseUrl(loadApiBaseUrl(DEFAULT_API_BASE_URL)));
+  const [endpointDraft, setEndpointDraft] = useState(() => normalizeApiBaseUrl(loadApiBaseUrl(DEFAULT_API_BASE_URL)));
   const [healthStatus, setHealthStatus] = useState<HealthStatus>('unknown');
   const [healthMessage, setHealthMessage] = useState('게이트웨이 상태를 확인하는 중입니다.');
   const [models, setModels] = useState<ModelInfo[]>(DEFAULT_MODELS);
@@ -166,18 +170,28 @@ export default function App() {
         fetch(`${apiBaseUrl}/api/models`),
       ]);
 
-      if (!healthResponse.ok) {
-        const payload = await safeJson(healthResponse);
-        throw new Error(payload?.error ?? 'Gateway is not healthy.');
+      const healthPayload = await safeJson(healthResponse);
+      const upstreamDown = healthPayload?.status === 'degraded';
+
+      if (!healthResponse.ok && !upstreamDown) {
+        throw new Error(healthPayload?.error ?? `Gateway HTTP ${healthResponse.status}`);
       }
 
-      const healthPayload = await healthResponse.json();
-      setHealthStatus('connected');
-      setHealthMessage(
-        healthPayload.models?.length
-          ? `연결 완료 · ${healthPayload.models.join(', ')}`
-          : '연결 완료',
-      );
+      if (upstreamDown || (!healthResponse.ok && healthResponse.status === 503)) {
+        setHealthStatus('upstream_degraded');
+        setHealthMessage(
+          healthPayload?.error
+            ? `Funnel 연결됨 · 로컬 라우터: ${healthPayload.error}`
+            : 'Funnel 연결됨 · 로컬 LLM 라우터가 응답하지 않습니다.',
+        );
+      } else {
+        setHealthStatus('connected');
+        setHealthMessage(
+          healthPayload?.models?.length
+            ? `연결 완료 · ${healthPayload.models.join(', ')}`
+            : '연결 완료',
+        );
+      }
 
       if (modelsResponse.ok) {
         const modelsPayload = await modelsResponse.json();
@@ -347,7 +361,8 @@ export default function App() {
   }
 
   function handleApplyEndpoint() {
-    setApiBaseUrl(endpointDraft.trim().replace(/\/$/, ''));
+    setApiBaseUrl(normalizeApiBaseUrl(endpointDraft));
+    setEndpointDraft((current) => normalizeApiBaseUrl(current));
   }
 
   function handleThreadScroll() {
@@ -729,6 +744,8 @@ function healthLabel(status: HealthStatus) {
   switch (status) {
     case 'connected':
       return 'Gateway Online';
+    case 'upstream_degraded':
+      return 'Funnel OK · LLM offline';
     case 'degraded':
       return 'Gateway Issue';
     case 'missing':

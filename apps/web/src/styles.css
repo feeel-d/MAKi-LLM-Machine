@@ -149,6 +149,10 @@ p {
   background: #56d480;
 }
 
+.status-dot--upstream_degraded {
+  background: #d4c14a;
+}
+
 .status-dot--degraded {
   background: #f4b257;
 }

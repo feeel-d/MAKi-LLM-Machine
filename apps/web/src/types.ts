@@ -1,7 +1,12 @@
 export type ResponseModel = 'deepseek' | 'qwen' | 'gemma26' | 'gemmae4';
 export type ModelKind = ResponseModel | 'all' | 'gemma_all';
 export type ResponseStatus = 'idle' | 'streaming' | 'done' | 'error';
-export type HealthStatus = 'unknown' | 'connected' | 'degraded' | 'missing';
+export type HealthStatus =
+  | 'unknown'
+  | 'connected'
+  | 'upstream_degraded'
+  | 'degraded'
+  | 'missing';
 
 export type ChatMessage = {
   role: 'user' | 'assistant' | 'system';

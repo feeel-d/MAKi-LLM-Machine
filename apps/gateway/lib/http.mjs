@@ -52,7 +52,10 @@ export function setCorsHeaders(request, response, allowedOrigins) {
   }
 
   response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  response.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Accept, Authorization, Cache-Control',
+  );
 }
 
 export function sendJson(response, statusCode, payload) {
