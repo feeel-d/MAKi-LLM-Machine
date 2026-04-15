@@ -290,7 +290,7 @@ export default function App() {
         error instanceof Error
           ? error.name === 'AbortError'
             ? '중단됨'
-            : error.message
+            : formatBrowserFetchError(error.message)
           : '요청 처리 중 오류가 발생했습니다.';
       markStreamingAs(nextConversationId, nextTurnId, 'error', message);
     } finally {
@@ -738,6 +738,18 @@ function buildMessageHistory(turns: Turn[], targetModel: ResponseModel, nextProm
 
 function trimTitle(prompt: string) {
   return prompt.length > 42 ? `${prompt.slice(0, 42)}...` : prompt;
+}
+
+function formatBrowserFetchError(message: string) {
+  const lower = message.toLowerCase();
+  if (
+    lower === 'failed to fetch' ||
+    lower === 'fetch failed' ||
+    lower.includes('networkerror when attempting to fetch')
+  ) {
+    return '브라우저에서 게이트웨이에 연결하지 못했습니다(CORS·오프라인·URL 오타·HTTPS). 사이드바 Gateway URL과 Funnel 상태를 확인하세요.';
+  }
+  return message;
 }
 
 function healthLabel(status: HealthStatus) {

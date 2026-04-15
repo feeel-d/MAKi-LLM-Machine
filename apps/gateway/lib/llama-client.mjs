@@ -1,16 +1,23 @@
 import { createSseParser, extractDeltaText } from './sse.mjs';
 
 export async function fetchRouterModels(config) {
-  const response = await fetch(new URL('/v1/models', config.llamaServerUrl), {
-    headers: buildHeaders(config),
-  });
+  try {
+    const response = await fetch(new URL('/v1/models', config.llamaServerUrl), {
+      headers: buildHeaders(config),
+    });
 
-  if (!response.ok) {
-    throw new Error(`Model lookup failed with status ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`Model lookup failed with status ${response.status}`);
+    }
+
+    const payload = await response.json();
+    return Array.isArray(payload?.data) ? payload.data : [];
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Model lookup failed')) {
+      throw error;
+    }
+    throw new Error(formatUpstreamFetchError(error, config.llamaServerUrl));
   }
-
-  const payload = await response.json();
-  return Array.isArray(payload?.data) ? payload.data : [];
 }
 
 export async function streamChatCompletion({
@@ -87,17 +94,52 @@ export async function streamChatCompletion({
 
     onDone({ model, requestId });
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : typeof error === 'string'
-          ? error
-          : 'Unknown upstream error.';
-
-    onError({ model, requestId, error: message });
+    onError({
+      model,
+      requestId,
+      error: formatUpstreamFetchError(error, config.llamaServerUrl),
+    });
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/** Node undici 등에서 흔한 "fetch failed"를 그대로 쓰면 Gemma E4B만 실패한 것처럼 보여도, 실제는 라우터 연결/슬롯 로드 문제인 경우가 많음 */
+function formatUpstreamFetchError(error, llamaServerUrl) {
+  const base =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : 'Unknown upstream error.';
+  let detail = base;
+  if (error instanceof Error && error.cause instanceof Error) {
+    detail = `${base} (${error.cause.message})`;
+  }
+
+  const lower = detail.toLowerCase();
+  const routerHint =
+    'Mac에서 llama-server(라우터)가 떠 있는지, `curl ' +
+    String(llamaServerUrl).replace(/\/$/, '') +
+    '/v1/models` 로 확인하세요. Gemma E4B만 실패하면 해당 GGUF 로드 실패·메모리 부족일 수 있습니다.';
+
+  if (lower.includes('fetch failed') || lower.includes('failed to fetch')) {
+    return `로컬 라우터(${llamaServerUrl})로 HTTP 요청 실패 — ${routerHint}`;
+  }
+  if (detail.includes('ECONNREFUSED')) {
+    return `로컬 라우터가 꺼져 있거나 포트가 다릅니다(LLAMA_SERVER_URL=${llamaServerUrl}). ./scripts/run-llama-router.sh 실행 여부를 확인하세요.`;
+  }
+  if (
+    detail.includes('ECONNRESET') ||
+    detail.includes('UND_ERR_SOCKET') ||
+    detail.includes('other side closed')
+  ) {
+    return `라우터 연결이 끊겼습니다(모델 슬롯·OOM·세그폴트 가능). ${detail}`;
+  }
+  if (base === 'timeout' || lower.includes('timeout')) {
+    return `요청 시간 초과 — 모델이 크면 라우터 타임아웃일 수 있습니다. ${detail}`;
+  }
+  return detail;
 }
 
 function buildHeaders(config) {
