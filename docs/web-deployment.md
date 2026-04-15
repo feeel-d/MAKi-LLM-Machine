@@ -12,7 +12,7 @@
 
 ```bash
 npm install
-chmod +x scripts/run-llama-router.sh scripts/run-gateway.sh scripts/start-funnel.sh scripts/install-launchd.sh scripts/start-all.sh scripts/stop-all.sh scripts/restart-all.sh scripts/download-gemma-models.sh scripts/dev-web-4stack.sh
+chmod +x scripts/run-llama-router.sh scripts/run-gateway.sh scripts/start-funnel.sh scripts/install-launchd.sh scripts/start-all.sh scripts/stop-all.sh scripts/restart-all.sh scripts/download-gemma-models.sh scripts/dev-web-4stack.sh scripts/test-local-stack.sh scripts/run-local-tests.sh run_gemma26_test.sh run_gemmae4_test.sh
 ```
 
 ### 로컬 4모델(Gemma 포함) + 웹 UI
@@ -43,6 +43,20 @@ Gemma GGUF가 없으면 `~/models/gemma4-26b.gguf`, `gemma4-e4b.gguf` 를 먼저
 - `start-all.sh`: router -> gateway -> funnel 순서로 기동
 - `stop-all.sh`: gateway -> router -> funnel 순서로 종료
 - `restart-all.sh`: 전체 종료 후 다시 기동
+
+### 2.1 로컬 자체 테스트 (푸시·Funnel 전에)
+
+**GGUF 단독**(DeepSeek/Qwen/Gemma와 동일 패턴): `./run_deepseek_test.sh`, `./run_qwen_test.sh`, `./run_gemma26_test.sh`, `./run_gemmae4_test.sh`
+
+**게이트웨이+라우터 HTTP**(기동 후):
+
+```bash
+./scripts/start-all.sh    # 한 터미널에서
+npm run test:local        # 다른 터미널 — health / models / chat 스트림(기본 deepseek)
+# 전부: npm run test:all  (단위 테스트 + 위 스모크)
+```
+
+웹 UI(`npm run dev:web` 또는 GitHub Pages)에서 쓰는 것과 같은 API 경로를 `curl`로 확인합니다. 통과 후 푸시하면 Pages에서도 동일 Gateway URL로 동작을 맞출 수 있습니다.
 
 ## 3. llama-server router 실행
 

@@ -10,6 +10,8 @@
     "build:web": "npm run build --workspace @maki/web",
     "start:gateway": "npm run start --workspace @maki/gateway",
     "dev:web": "VITE_API_BASE_URL=http://127.0.0.1:3001 npm run dev --workspace @maki/web",
-    "test": "npm run test --workspace @maki/gateway"
+    "test": "npm run test --workspace @maki/gateway",
+    "test:local": "bash scripts/test-local-stack.sh",
+    "test:all": "bash scripts/run-local-tests.sh"
   }
 }

@@ -105,6 +105,12 @@ qwen-run -p "구조적으로 정리해줘: ..."
 |----------|------|
 | `./run_deepseek_test.sh` | 컨텍스트 65536→49152→32768→16384 순으로 재시도 후 성공 시 종료 |
 | `./run_qwen_test.sh` | 고정 프롬프트로 단일 추론 테스트 |
+| `./run_gemma26_test.sh` | Gemma 4 26B — DeepSeek와 같이 ctx 16384→8192→4096 재시도 |
+| `./run_gemmae4_test.sh` | Gemma 4 E4B — Qwen과 같이 단일 ctx(16384) 스모크 |
+| `npm run test:local` | **라우터(8081)+게이트웨이(3001) 기동 후** `/api/health`, `/api/models`, `POST /api/chat/stream`(기본 `deepseek` 한 줄) 검증 |
+| `npm run test:all` | `npm test`(게이트웨이 단위) + `test:local` |
+
+`test:local` 옵션: `SKIP_CHAT=1`(헬스·모델만), `SKIP_ROUTER=1`(게이트웨이만), `CHAT_MODEL=qwen` 등.
 
 ---
 

@@ -114,6 +114,49 @@ echo "✅ Qwen test OK"
 EOS
 chmod 0755 "$SCRIPT_DIR/run_qwen_test.sh"
 
+cat > "$SCRIPT_DIR/run_gemma26_test.sh" <<'EOS'
+#!/usr/bin/env bash
+# Gemma 4 26B — DeepSeek 테스트와 동일하게 ctx 를 내려가며 재시도 (메모리·KV 한계 대비)
+set -euo pipefail
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
+MODEL="${MODEL:-$HOME/models/gemma4-26b.gguf}"
+LLAMA_COMPLETION="${LLAMA_COMPLETION:-$HOME/llama.cpp/build/bin/llama-completion}"
+THREADS=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+[[ -x "$LLAMA_COMPLETION" ]] || { echo "❌ llama-completion 없음: $LLAMA_COMPLETION"; exit 1; }
+[[ -f "$MODEL" ]] || { echo "❌ 모델 없음: $MODEL"; exit 1; }
+echo "=== Gemma 4 26B Test Start ==="
+PROMPT='다음을 한국어로 간단히 요약해줘 (3문장 이내):
+인공지능은 패턴 인식과 예측을 통해 문제를 해결하는 기술이다.'
+for ctx in 16384 8192 4096; do
+  echo "Trying ctx=$ctx"
+  if "$LLAMA_COMPLETION" -m "$MODEL" -n 128 --ctx-size "$ctx" --threads "$THREADS" --temp 0.7 -no-cnv -p "$PROMPT"; then
+    echo "✅ SUCCESS at ctx=$ctx"
+    exit 0
+  fi
+done
+echo "❌ FAILED: All ctx attempts"
+exit 1
+EOS
+chmod 0755 "$SCRIPT_DIR/run_gemma26_test.sh"
+
+cat > "$SCRIPT_DIR/run_gemmae4_test.sh" <<'EOS'
+#!/usr/bin/env bash
+# Gemma 4 E4B — Qwen 테스트와 동일하게 단일 ctx 로 스모크 (가벼운 쪽)
+set -euo pipefail
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
+MODEL="${MODEL:-$HOME/models/gemma4-e4b.gguf}"
+LLAMA_COMPLETION="${LLAMA_COMPLETION:-$HOME/llama.cpp/build/bin/llama-completion}"
+THREADS=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+[[ -x "$LLAMA_COMPLETION" ]] || { echo "❌ llama-completion 없음: $LLAMA_COMPLETION"; exit 1; }
+[[ -f "$MODEL" ]] || { echo "❌ 모델 없음: $MODEL"; exit 1; }
+echo "=== Gemma 4 E4B Test Start ==="
+"$LLAMA_COMPLETION" -m "$MODEL" -n 128 --ctx-size 16384 --threads "$THREADS" --temp 0.7 -no-cnv \
+  -p "한 문장으로 답해줘: 머신러닝이란 무엇인가?"
+echo ""
+echo "✅ Gemma E4B test OK"
+EOS
+chmod 0755 "$SCRIPT_DIR/run_gemmae4_test.sh"
+
 if [[ "${SKIP_ZSHRC:-0}" != "1" ]]; then
   echo "[6/6] ~/.zshrc 에 deepseek-run / qwen-run 등록…"
   ZSH_MARK_BEGIN="# --- MAKi local LLM (llama.cpp: llama-completion + -no-cnv) ---"
@@ -157,6 +200,8 @@ echo ""
 echo "바이너리: $LLAMA_COMPLETION"
 echo "모델:     $MODELS_DIR/deepseek.gguf , $MODELS_DIR/qwen.gguf , $MODELS_DIR/gemma4-26b.gguf , $MODELS_DIR/gemma4-e4b.gguf"
 echo ""
-echo "테스트:   cd $SCRIPT_DIR && ./run_deepseek_test.sh && ./run_qwen_test.sh"
-echo "빠른 실행: deepseek-run -p '요약해줘: …'   /   qwen-run -p '정리해줘: …'"
+echo "GGUF 스모크: cd $SCRIPT_DIR && ./run_deepseek_test.sh && ./run_qwen_test.sh"
+echo "             (선택) ./run_gemma26_test.sh  ./run_gemmae4_test.sh"
+echo "스택 HTTP:   라우터+게이트웨이 기동 후  npm run test:local"
+echo "빠른 실행:   deepseek-run -p '요약해줘: …'   /   qwen-run -p '정리해줘: …'"
 echo "=============================="
