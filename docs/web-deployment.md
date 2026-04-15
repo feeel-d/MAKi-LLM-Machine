@@ -137,3 +137,39 @@ curl http://127.0.0.1:3001/api/models
 ```
 
 `All` 모드는 게이트웨이가 DeepSeek와 Qwen을 동시에 호출하고, `Gemma All` 모드는 `gemma26`와 `gemmae4`를 동시에 호출합니다. SSE는 모델별 이벤트로 합쳐져 브라우저에 전달됩니다.
+
+## 9. GitHub Pages에서 `Gateway Issue` / `Failed to fetch` 일 때
+
+브라우저가 게이트웨이 URL로 `fetch` 했을 때 **리다이렉트·HTML·CORS** 중 하나면 상태가 `degraded` 가 되고 메시지가 `Failed to fetch` 로 보일 수 있습니다.
+
+### 9.1 반드시 나와야 하는 것 (Mac에서 확인)
+
+게이트웨이가 **이 저장소의 Node 서버**(`apps/gateway/server.mjs`, 기본 `127.0.0.1:3001`)에 붙어 있어야 합니다. 터미널에서:
+
+```bash
+curl -sS http://127.0.0.1:3001/api/health
+```
+
+응답이 **JSON**이고 `"status":"ok"` 가 나와야 합니다.
+
+공개 URL( Tailscale Funnel 등)은 **리다이렉트 없이** 같은 JSON이 나와야 합니다.
+
+```bash
+curl -sSIL "https://(Funnel에 표시된 호스트)/api/health"
+```
+
+- **정상:** 최종 응답이 `200`, 본문이 `{"status":"ok",...}` 형태의 JSON.
+- **비정상 예:** `301` / `302` 로 **다른 도메인**(예: `app.markhub.ai`)으로 보내지거나, `200` 인데 본문이 **HTML**이면 — 앞단 **nginx 등 리버스 프록시**가 `3001` 이 아니라 다른 서비스로 보내고 있거나, 전역 리다이렉트가 걸린 상태입니다. 이 경우 GitHub Pages 프론트는 JSON을 못 받아 `Failed to fetch` 가 납니다.
+
+### 9.2 권장 구성 (이 프로젝트 스크립트)
+
+1. `./scripts/run-gateway.sh` 로 게이트웨이 기동 (또는 `start-all.sh`).
+2. `tailscale funnel --bg 3001` (`scripts/start-funnel.sh` 와 동일).  
+   - Funnel이 붙는 포트는 **반드시 게이트웨이가 듣는 포트**와 같아야 합니다.
+3. `tailscale funnel status` 에 나오는 **`https://....ts.net` 주소**를 브라우저 Gateway URL에 넣습니다 (끝 `/` 없이).
+
+nginx 를 443 에 두고 Tailscale 트래픽을 먼저 받는 경우, **전체를 `app.markhub.ai` 로 301** 하지 말고, 최소한 `location /api/` 는 `proxy_pass http://127.0.0.1:3001;` 로 게이트웨이에 넘기거나, Funnel 전용 호스트는 Node 게이트웨이만 보이게 분리합니다.
+
+### 9.3 CORS
+
+게이트웨이는 기본으로 `https://feeel-d.github.io` 출처를 허용합니다. 다른 Pages 도메인을 쓰면 `ALLOWED_ORIGINS` 환경 변수에 해당 Origin 을 추가한 뒤 게이트웨이를 다시 띄웁니다.
