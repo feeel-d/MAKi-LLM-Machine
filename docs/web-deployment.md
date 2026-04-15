@@ -33,7 +33,7 @@ chmod +x scripts/run-llama-router.sh scripts/run-gateway.sh scripts/start-funnel
 
 ## 3. llama-server router 실행
 
-기본 모델 경로는 `~/models/deepseek.gguf`, `~/models/qwen.gguf` 입니다.
+기본 모델 경로는 `~/models/deepseek.gguf`, `~/models/qwen.gguf`, `~/models/gemma4-26b.gguf`, `~/models/gemma4-e4b.gguf` 입니다.
 
 ```bash
 ./scripts/run-llama-router.sh
@@ -41,7 +41,9 @@ chmod +x scripts/run-llama-router.sh scripts/run-gateway.sh scripts/start-funnel
 
 환경 변수로 조정 가능한 값:
 
-- `DEEPSEEK_CTX`, `QWEN_CTX`: 기본 `16384`
+- `DEEPSEEK_CTX`, `QWEN_CTX`, `GEMMA26_CTX`, `GEMMAE4_CTX`: 기본 `16384`
+- `DEEPSEEK_MODEL_PATH`, `QWEN_MODEL_PATH`, `GEMMA26_MODEL_PATH`, `GEMMAE4_MODEL_PATH`
+- `MODELS_MAX`: 기본 `4` (프리셋 슬롯 수와 맞춤; 메모리에 따라 낮출 수 있음)
 - `ROUTER_PORT`: 기본 `8080`
 - `LLAMA_API_KEY`: 내부 llama-server 보호가 필요할 때 사용
 
@@ -121,4 +123,4 @@ curl http://127.0.0.1:3001/api/health
 curl http://127.0.0.1:3001/api/models
 ```
 
-`All` 모드는 게이트웨이가 DeepSeek와 Qwen을 동시에 호출하고, SSE를 모델별 이벤트로 합쳐서 브라우저에 전달합니다.
+`All` 모드는 게이트웨이가 DeepSeek와 Qwen을 동시에 호출하고, `Gemma All` 모드는 `gemma26`와 `gemmae4`를 동시에 호출합니다. SSE는 모델별 이벤트로 합쳐져 브라우저에 전달됩니다.

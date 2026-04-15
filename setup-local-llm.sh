@@ -6,6 +6,7 @@
 #   SKIP_ZSHRC=1        ~/.zshrc 에 deepseek-run / qwen-run 추가 생략
 #   FORCE_LLAMA_REBUILD=1  llama.cpp 를 항상 다시 빌드
 #   LLAMA_CPP_ROOT       기본 ~/llama.cpp
+#   GEMMA26_URL / GEMMAE4_URL  Gemma 4 GGUF (기본 bartowski Q4_K_M)
 
 set -euo pipefail
 
@@ -18,6 +19,8 @@ JOBS="${JOBS:-$( (sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4) 
 
 DEEPSEEK_URL="${DEEPSEEK_URL:-https://huggingface.co/bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF/resolve/main/DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf}"
 QWEN_URL="${QWEN_URL:-https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf}"
+GEMMA26_URL="${GEMMA26_URL:-https://huggingface.co/bartowski/google_gemma-4-26B-A4B-it-GGUF/resolve/main/google_gemma-4-26B-A4B-it-Q4_K_M.gguf}"
+GEMMAE4_URL="${GEMMAE4_URL:-https://huggingface.co/bartowski/google_gemma-4-E4B-it-GGUF/resolve/main/google_gemma-4-E4B-it-Q4_K_M.gguf}"
 
 echo "[1/6] 의존성 (git, cmake, wget)…"
 if ! command -v brew >/dev/null 2>&1; then
@@ -51,10 +54,14 @@ if [[ "${SKIP_DOWNLOAD:-0}" != "1" ]]; then
   echo "[4/6] GGUF 다운로드 (이미 있으면 wget -c 로 이어받기)…"
   wget -c -O "$MODELS_DIR/deepseek.gguf" "$DEEPSEEK_URL"
   wget -c -O "$MODELS_DIR/qwen.gguf" "$QWEN_URL"
+  wget -c -O "$MODELS_DIR/gemma4-26b.gguf" "$GEMMA26_URL"
+  wget -c -O "$MODELS_DIR/gemma4-e4b.gguf" "$GEMMAE4_URL"
 else
   echo "[4/6] SKIP_DOWNLOAD=1 → 모델 다운로드 생략"
   [[ -f "$MODELS_DIR/deepseek.gguf" ]] || echo "  경고: $MODELS_DIR/deepseek.gguf 없음"
   [[ -f "$MODELS_DIR/qwen.gguf" ]] || echo "  경고: $MODELS_DIR/qwen.gguf 없음"
+  [[ -f "$MODELS_DIR/gemma4-26b.gguf" ]] || echo "  경고: $MODELS_DIR/gemma4-26b.gguf 없음"
+  [[ -f "$MODELS_DIR/gemma4-e4b.gguf" ]] || echo "  경고: $MODELS_DIR/gemma4-e4b.gguf 없음"
 fi
 
 echo "[5/6] 프로젝트 테스트 스크립트 갱신…"
@@ -148,7 +155,7 @@ echo "=============================="
 echo "✅ SETUP COMPLETE"
 echo ""
 echo "바이너리: $LLAMA_COMPLETION"
-echo "모델:     $MODELS_DIR/deepseek.gguf , $MODELS_DIR/qwen.gguf"
+echo "모델:     $MODELS_DIR/deepseek.gguf , $MODELS_DIR/qwen.gguf , $MODELS_DIR/gemma4-26b.gguf , $MODELS_DIR/gemma4-e4b.gguf"
 echo ""
 echo "테스트:   cd $SCRIPT_DIR && ./run_deepseek_test.sh && ./run_qwen_test.sh"
 echo "빠른 실행: deepseek-run -p '요약해줘: …'   /   qwen-run -p '정리해줘: …'"

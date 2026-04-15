@@ -64,7 +64,7 @@
 - `SKIP_DOWNLOAD=1` — 모델 다운로드 생략  
 - `SKIP_ZSHRC=1` — `.zshrc` 수정 생략  
 - `FORCE_LLAMA_REBUILD=1` — llama.cpp 강제 재빌드  
-- `LLAMA_CPP_ROOT`, `MODELS_DIR`, `DEEPSEEK_URL`, `QWEN_URL` — 경로·URL 재정의  
+- `LLAMA_CPP_ROOT`, `MODELS_DIR`, `DEEPSEEK_URL`, `QWEN_URL`, `GEMMA26_URL`, `GEMMAE4_URL` — 경로·URL 재정의  
 
 ---
 
@@ -74,8 +74,12 @@
 |------|--------------------------|------|
 | `~/models/deepseek.gguf` | `bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF` → `DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf` | 코드·분석·지시 따르기 |
 | `~/models/qwen.gguf` | `bartowski/Qwen2.5-7B-Instruct-GGUF` → `Qwen2.5-7B-Instruct-Q4_K_M.gguf` | 범용 지시·정리 (학습 컨텍스트 32k — 65k 지정 시 경고만 나올 수 있음) |
+| `~/models/gemma4-26b.gguf` | `bartowski/google_gemma-4-26B-A4B-it-GGUF` → `google_gemma-4-26B-A4B-it-Q4_K_M.gguf` | Gemma 4 (26B·A4B instruct) |
+| `~/models/gemma4-e4b.gguf` | `bartowski/google_gemma-4-E4B-it-GGUF` → `google_gemma-4-E4B-it-Q4_K_M.gguf` | Gemma 4 (E4B instruct, 26B 대비 작은 쪽) |
 
 다른 양자화/모델로 바꿀 때는 같은 경로에 덮어쓰거나, 스크립트의 `MODEL` 환경 변수를 지정합니다.
+
+**라우터(웹 게이트웨이)와 메모리:** `llama-server` 프리셋에 위 네 종류를 모두 올리면 통합 메모리 사용량이 매우 커질 수 있습니다. OOM이나 스왑이 나면 `config/llama-router-models.template.ini`에서 일부 모델만 `load-on-startup = true`로 두거나, `GEMMA26_CTX` / `GEMMAE4_CTX` 등을 낮추고, `scripts/run-llama-router.sh`의 `MODELS_MAX`(기본 4)와 실제 필요한 동시 로드 수를 맞춥니다. Ollama용 `gemma4` 가이드([gist](https://gist.github.com/greenstevester/fc49b4e60a4fef9effc79066c1033ae5))와 **런타임은 다르지만** 같은 Gemma 4 제품군을 참고할 때는 GGUF 경로·용량을 기준으로 판단하면 됩니다.
 
 ---
 

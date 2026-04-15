@@ -1,7 +1,14 @@
-export const MODEL_IDS = ['deepseek', 'qwen'];
+export const ROUTER_MODEL_IDS = ['deepseek', 'qwen', 'gemma26', 'gemmae4'];
 
 export function normalizeModel(value) {
-  if (value === 'deepseek' || value === 'qwen' || value === 'all') {
+  if (
+    value === 'deepseek' ||
+    value === 'qwen' ||
+    value === 'all' ||
+    value === 'gemma26' ||
+    value === 'gemmae4' ||
+    value === 'gemma_all'
+  ) {
     return value;
   }
 
@@ -10,7 +17,11 @@ export function normalizeModel(value) {
 
 export function resolveTargetModels(model) {
   if (model === 'all') {
-    return MODEL_IDS;
+    return ['deepseek', 'qwen'];
+  }
+
+  if (model === 'gemma_all') {
+    return ['gemma26', 'gemmae4'];
   }
 
   return [model];

@@ -36,15 +36,50 @@ const MODEL_LABELS: Record<ModelKind, string> = {
   deepseek: 'DeepSeek',
   qwen: 'Qwen',
   all: 'All',
+  gemma26: 'Gemma 4 26B',
+  gemmae4: 'Gemma 4 E4B',
+  gemma_all: 'Gemma All',
 };
 
-const RESPONSE_MODELS: ResponseModel[] = ['deepseek', 'qwen'];
+const RESPONSE_MODELS: ResponseModel[] = ['deepseek', 'qwen', 'gemma26', 'gemmae4'];
+
+const COMPARE_DEEPSEEK_QWEN: ResponseModel[] = ['deepseek', 'qwen'];
+const COMPARE_GEMMA: ResponseModel[] = ['gemma26', 'gemmae4'];
+
+const MODEL_GROUP_DEEPSEEK_QWEN: ModelKind[] = ['deepseek', 'qwen', 'all'];
+const MODEL_GROUP_GEMMA: ModelKind[] = ['gemma26', 'gemmae4', 'gemma_all'];
 
 const DEFAULT_MODELS: ModelInfo[] = [
   { id: 'deepseek', label: 'DeepSeek', available: true },
   { id: 'qwen', label: 'Qwen', available: true },
   { id: 'all', label: 'All', available: true },
+  { id: 'gemma26', label: 'Gemma 4 26B', available: true },
+  { id: 'gemmae4', label: 'Gemma 4 E4B', available: true },
+  { id: 'gemma_all', label: 'Gemma All', available: true },
 ];
+
+function modelsForGroup(allModels: ModelInfo[], group: ModelKind[]) {
+  return group
+    .map((id) => allModels.find((m) => m.id === id))
+    .filter((m): m is ModelInfo => Boolean(m));
+}
+
+function temperatureForMode(mode: ModelKind) {
+  if (mode === 'qwen' || mode === 'gemma26' || mode === 'gemmae4' || mode === 'gemma_all') {
+    return 0.7;
+  }
+  return 0.6;
+}
+
+function primaryResponseModel(mode: ModelKind): ResponseModel {
+  if (mode === 'all') {
+    return 'deepseek';
+  }
+  if (mode === 'gemma_all') {
+    return 'gemma26';
+  }
+  return mode;
+}
 
 export default function App() {
   const [conversations, setConversations] = useState<Conversation[]>(() => loadConversations());
@@ -198,7 +233,7 @@ export default function App() {
     abortRef.current = controller;
 
     try {
-      const primaryModel = selectedModel === 'all' ? 'deepseek' : selectedModel;
+      const primaryModel = primaryResponseModel(selectedModel);
       const response = await fetch(`${apiBaseUrl}/api/chat/stream`, {
         method: 'POST',
         headers: {
@@ -213,9 +248,14 @@ export default function App() {
                   deepseek: buildMessageHistory(priorTurns, 'deepseek', prompt),
                   qwen: buildMessageHistory(priorTurns, 'qwen', prompt),
                 }
-              : undefined,
+              : selectedModel === 'gemma_all'
+                ? {
+                    gemma26: buildMessageHistory(priorTurns, 'gemma26', prompt),
+                    gemmae4: buildMessageHistory(priorTurns, 'gemmae4', prompt),
+                  }
+                : undefined,
           maxTokens: 768,
-          temperature: selectedModel === 'qwen' ? 0.7 : 0.6,
+          temperature: temperatureForMode(selectedModel),
           systemPrompt: systemPrompt.trim() || undefined,
         }),
         signal: controller.signal,
@@ -255,7 +295,12 @@ export default function App() {
     event: string,
     payload: StreamPayload,
   ) {
-    if (payload.model !== 'deepseek' && payload.model !== 'qwen') {
+    if (
+      payload.model !== 'deepseek' &&
+      payload.model !== 'qwen' &&
+      payload.model !== 'gemma26' &&
+      payload.model !== 'gemmae4'
+    ) {
       return;
     }
 
@@ -389,17 +434,32 @@ export default function App() {
           </div>
 
           <div className="model-switcher">
-            {models.map((model) => (
-              <button
-                key={model.id}
-                type="button"
-                disabled={!model.available || isStreaming}
-                className={`model-pill ${selectedModel === model.id ? 'is-active' : ''}`}
-                onClick={() => setSelectedModel(model.id)}
-              >
-                {model.label}
-              </button>
-            ))}
+            <div className="model-switcher__row">
+              {modelsForGroup(models, MODEL_GROUP_DEEPSEEK_QWEN).map((model) => (
+                <button
+                  key={model.id}
+                  type="button"
+                  disabled={!model.available || isStreaming}
+                  className={`model-pill ${selectedModel === model.id ? 'is-active' : ''}`}
+                  onClick={() => setSelectedModel(model.id)}
+                >
+                  {model.label}
+                </button>
+              ))}
+            </div>
+            <div className="model-switcher__row">
+              {modelsForGroup(models, MODEL_GROUP_GEMMA).map((model) => (
+                <button
+                  key={model.id}
+                  type="button"
+                  disabled={!model.available || isStreaming}
+                  className={`model-pill ${selectedModel === model.id ? 'is-active' : ''}`}
+                  onClick={() => setSelectedModel(model.id)}
+                >
+                  {model.label}
+                </button>
+              ))}
+            </div>
           </div>
         </header>
 
@@ -426,7 +486,13 @@ export default function App() {
 
                 {turn.mode === 'all' ? (
                   <div className="compare-grid">
-                    {RESPONSE_MODELS.map((model) => (
+                    {COMPARE_DEEPSEEK_QWEN.map((model) => (
+                      <ResponseCard key={model} model={model} response={turn.responses[model]} />
+                    ))}
+                  </div>
+                ) : turn.mode === 'gemma_all' ? (
+                  <div className="compare-grid">
+                    {COMPARE_GEMMA.map((model) => (
                       <ResponseCard key={model} model={model} response={turn.responses[model]} />
                     ))}
                   </div>
@@ -443,9 +509,9 @@ export default function App() {
           ) : (
             <div className="empty-state">
               <p className="eyebrow">Ready</p>
-              <h3>DeepSeek, Qwen, 그리고 All 비교 모드까지 한 화면에서 바로 테스트할 수 있습니다.</h3>
+              <h3>DeepSeek·Qwen·Gemma를 한 화면에서 단일 또는 듀얼 비교로 테스트할 수 있습니다.</h3>
               <p>
-                `All`을 선택하면 같은 프롬프트를 두 모델에 동시에 보내고,
+                `All` 또는 `Gemma All`을 선택하면 같은 프롬프트를 두 모델에 동시에 보내고,
                 좌우 비교 카드에서 실시간 스트리밍으로 확인합니다.
               </p>
             </div>
@@ -627,6 +693,14 @@ function createTurn(turnId: string, prompt: string, mode: ModelKind): Turn {
       qwen: {
         text: '',
         status: mode === 'qwen' || mode === 'all' ? 'streaming' : 'idle',
+      },
+      gemma26: {
+        text: '',
+        status: mode === 'gemma26' || mode === 'gemma_all' ? 'streaming' : 'idle',
+      },
+      gemmae4: {
+        text: '',
+        status: mode === 'gemmae4' || mode === 'gemma_all' ? 'streaming' : 'idle',
       },
     },
   };

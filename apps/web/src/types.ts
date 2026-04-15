@@ -1,5 +1,5 @@
-export type ModelKind = 'deepseek' | 'qwen' | 'all';
-export type ResponseModel = 'deepseek' | 'qwen';
+export type ResponseModel = 'deepseek' | 'qwen' | 'gemma26' | 'gemmae4';
+export type ModelKind = ResponseModel | 'all' | 'gemma_all';
 export type ResponseStatus = 'idle' | 'streaming' | 'done' | 'error';
 export type HealthStatus = 'unknown' | 'connected' | 'degraded' | 'missing';
 

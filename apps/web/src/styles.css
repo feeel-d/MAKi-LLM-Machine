@@ -249,8 +249,16 @@ p {
 
 .model-switcher {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.model-switcher__row {
+  display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .model-pill {

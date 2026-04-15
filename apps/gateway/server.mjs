@@ -5,7 +5,7 @@ import { CapacityQueue } from './lib/capacity-queue.mjs';
 import { loadConfig } from './lib/config.mjs';
 import { readJsonBody, getClientIp, sendJson, setCorsHeaders } from './lib/http.mjs';
 import { fetchRouterModels, streamChatCompletion } from './lib/llama-client.mjs';
-import { MODEL_IDS, normalizeModel, resolveTargetModels } from './lib/models.mjs';
+import { ROUTER_MODEL_IDS, normalizeModel, resolveTargetModels } from './lib/models.mjs';
 import { RateLimiter } from './lib/rate-limiter.mjs';
 import { sendEvent, writeSseHeaders } from './lib/sse.mjs';
 
@@ -82,7 +82,7 @@ async function handleHealth(response) {
     const models = await fetchRouterModels(config);
     const visibleModels = models
       .map((entry) => entry.id)
-      .filter((id) => MODEL_IDS.includes(id));
+      .filter((id) => ROUTER_MODEL_IDS.includes(id));
     sendJson(response, 200, {
       status: 'ok',
       upstream: 'reachable',
@@ -110,6 +110,13 @@ async function handleModels(response) {
           label: 'All',
           available: available.has('deepseek') && available.has('qwen'),
         },
+        { id: 'gemma26', label: 'Gemma 4 26B', available: available.has('gemma26') },
+        { id: 'gemmae4', label: 'Gemma 4 E4B', available: available.has('gemmae4') },
+        {
+          id: 'gemma_all',
+          label: 'Gemma All',
+          available: available.has('gemma26') && available.has('gemmae4'),
+        },
       ],
     });
   } catch (error) {
@@ -133,7 +140,7 @@ async function handleChatStream(request, response) {
   }
 
   const clientIp = getClientIp(request);
-  const cost = model === 'all' ? 2 : 1;
+  const cost = model === 'all' || model === 'gemma_all' ? 2 : 1;
 
   if (!rateLimiter.allow(clientIp, cost)) {
     sendJson(response, 429, { error: 'Rate limit exceeded.' });
@@ -165,7 +172,7 @@ async function handleChatStream(request, response) {
             config,
             model: targetModel,
             messages:
-              model === 'all' && body.messagesByModel?.[targetModel]
+              (model === 'all' || model === 'gemma_all') && body.messagesByModel?.[targetModel]
                 ? body.messagesByModel[targetModel]
                 : body.messages,
             systemPrompt: body.systemPrompt,
@@ -178,7 +185,7 @@ async function handleChatStream(request, response) {
               completed += 1;
               emit('done', payload);
               if (completed === targetModels.length) {
-                emit('done', { requestId, model: 'all', finished: true });
+                emit('done', { requestId, model, finished: true });
               }
             },
             onError: (payload) => emit('error', payload),
