@@ -12,8 +12,21 @@
 
 ```bash
 npm install
-chmod +x scripts/run-llama-router.sh scripts/run-gateway.sh scripts/start-funnel.sh scripts/install-launchd.sh scripts/start-all.sh scripts/stop-all.sh scripts/restart-all.sh
+chmod +x scripts/run-llama-router.sh scripts/run-gateway.sh scripts/start-funnel.sh scripts/install-launchd.sh scripts/start-all.sh scripts/stop-all.sh scripts/restart-all.sh scripts/download-gemma-models.sh scripts/dev-web-4stack.sh
 ```
+
+### 로컬 4모델(Gemma 포함) + 웹 UI
+
+Gemma GGUF가 없으면 `~/models/gemma4-26b.gguf`, `gemma4-e4b.gguf` 를 먼저 받습니다(용량·시간 큼).
+
+```bash
+./scripts/download-gemma-models.sh
+./scripts/dev-web-4stack.sh
+```
+
+- 브라우저: `http://127.0.0.1:5173/` (개발 모드 base는 `/` — [apps/web/vite.config.ts](apps/web/vite.config.ts) 참고)
+- 게이트웨이는 스크립트가 `VITE_API_BASE_URL=http://127.0.0.1:3001` 로 띄웁니다.
+- 다운로드 로그: `.runtime/gemma-download.log`, 라우터/게이트웨이 로그: `.runtime/router-dev.log`, `.runtime/gateway-dev.log`
 
 ## 2. 일괄 실행
 
