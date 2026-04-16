@@ -101,10 +101,19 @@ export default function App() {
   const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const threadRef = useRef<HTMLElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const autoScrollRef = useRef(true);
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? null;
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [draft]);
 
   useEffect(() => {
     saveConversations(conversations);
@@ -601,6 +610,7 @@ export default function App() {
 
         <footer className="composer">
           <textarea
+            ref={textareaRef}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
@@ -610,7 +620,7 @@ export default function App() {
               }
             }}
             placeholder="프롬프트를 입력하세요. Shift+Enter로 줄바꿈합니다."
-            rows={4}
+            rows={1}
           />
           <div className="composer__footer">
             <div className="composer__hint">

@@ -403,7 +403,9 @@ p {
 
 .composer textarea {
   width: 100%;
-  min-height: 120px;
+  min-height: 42px;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .composer {
@@ -639,7 +641,8 @@ p {
   }
 
   .composer textarea {
-    min-height: 80px; /* 모바일에서는 입력창 높이를 줄임 */
+    min-height: 38px;
+    max-height: 150px;
     font-size: 0.95rem;
   }
 
