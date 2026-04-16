@@ -406,6 +406,9 @@ export default function App() {
           <p className="eyebrow">MAKi LLM</p>
           <h1>Console</h1>
         </div>
+        <button className="ghost-button ghost-button--small" onClick={handleNewConversationAndClose} type="button">
+          + New
+        </button>
       </header>
 
       <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)} />
@@ -416,6 +419,9 @@ export default function App() {
             <p className="eyebrow">MAKi LLM Machine</p>
             <h1>Public LLM Console</h1>
           </div>
+          <button className="ghost-button" onClick={handleNewConversation} type="button">
+            New Chat
+          </button>
         </div>
 
         <div className="status-card">
@@ -473,22 +479,38 @@ export default function App() {
 
       <main className="workspace">
         <header className="workspace__header">
-          <button className="primary-button" onClick={handleNewConversation} type="button">
-            + New
-          </button>
+          <div>
+            <p className="eyebrow">Live Compare</p>
+            <h2>{selectedConversation?.title ?? '새 대화'}</h2>
+          </div>
 
           <div className="model-switcher">
-            {models.map((model) => (
-              <button
-                key={model.id}
-                type="button"
-                disabled={!model.available || isStreaming}
-                className={`model-pill ${selectedModel === model.id ? 'is-active' : ''}`}
-                onClick={() => setSelectedModel(model.id)}
-              >
-                {model.label}
-              </button>
-            ))}
+            <div className="model-switcher__row">
+              {modelsForGroup(models, MODEL_GROUP_DEEPSEEK_QWEN).map((model) => (
+                <button
+                  key={model.id}
+                  type="button"
+                  disabled={!model.available || isStreaming}
+                  className={`model-pill ${selectedModel === model.id ? 'is-active' : ''}`}
+                  onClick={() => setSelectedModel(model.id)}
+                >
+                  {model.label}
+                </button>
+              ))}
+            </div>
+            <div className="model-switcher__row">
+              {modelsForGroup(models, MODEL_GROUP_GEMMA).map((model) => (
+                <button
+                  key={model.id}
+                  type="button"
+                  disabled={!model.available || isStreaming}
+                  className={`model-pill ${selectedModel === model.id ? 'is-active' : ''}`}
+                  onClick={() => setSelectedModel(model.id)}
+                >
+                  {model.label}
+                </button>
+              ))}
+            </div>
           </div>
         </header>
 
