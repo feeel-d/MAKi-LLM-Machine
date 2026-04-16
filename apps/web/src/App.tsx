@@ -97,6 +97,7 @@ export default function App() {
   const [healthMessage, setHealthMessage] = useState('게이트웨이 상태를 확인하는 중입니다.');
   const [models, setModels] = useState<ModelInfo[]>(DEFAULT_MODELS);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const threadRef = useRef<HTMLElement | null>(null);
   const autoScrollRef = useRef(true);
@@ -375,8 +376,42 @@ export default function App() {
     autoScrollRef.current = distanceFromBottom < 96;
   }
 
+  function handleSelectConversation(id: string) {
+    setSelectedConversationId(id);
+    setIsSidebarOpen(false);
+  }
+
+  function handleNewConversationAndClose() {
+    handleNewConversation();
+    setIsSidebarOpen(false);
+  }
+
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isSidebarOpen ? 'is-sidebar-open' : ''}`}>
+      <header className="mobile-header">
+        <button
+          className="menu-button"
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          type="button"
+          aria-label="Toggle Menu"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+        <div className="mobile-header__title">
+          <p className="eyebrow">MAKi LLM</p>
+          <h1>Console</h1>
+        </div>
+        <button className="ghost-button ghost-button--small" onClick={handleNewConversationAndClose} type="button">
+          + New
+        </button>
+      </header>
+
+      <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)} />
+
       <aside className="sidebar">
         <div className="sidebar__header">
           <div>
@@ -422,7 +457,7 @@ export default function App() {
               >
                 <button
                   className="conversation-item__button"
-                  onClick={() => setSelectedConversationId(conversation.id)}
+                  onClick={() => handleSelectConversation(conversation.id)}
                   type="button"
                 >
                   <span>{conversation.title}</span>

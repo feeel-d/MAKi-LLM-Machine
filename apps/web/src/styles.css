@@ -399,20 +399,108 @@ p {
   gap: 12px;
 }
 
+.ghost-button--small {
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
+.mobile-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.menu-button {
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-header__title {
+  text-align: center;
+}
+
+.mobile-header__title h1 {
+  font-size: 1rem;
+}
+
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
 @media (max-width: 1080px) {
+  .mobile-header {
+    display: flex;
+  }
+
   .app-shell {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
   }
 
   .sidebar {
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-    height: auto;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 110;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
+    box-shadow: 20px 0 50px rgba(0, 0, 0, 0.5);
+  }
+
+  .is-sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .is-sidebar-open .sidebar-overlay {
+    display: block;
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .workspace {
-    height: 100%;
+    height: calc(100vh - 60px); /* mobile-header height */
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .workspace__header {
+    padding: 14px 18px;
+  }
+
+  .system-panel {
+    display: none; /* 모바일에서 공간 확보를 위해 시스템 프롬프트는 숨김 (필요시 사이드바 이동 고려) */
+  }
+
+  .chat-thread {
+    padding-bottom: 100px;
+  }
+
+  .sidebar__header {
+    display: none; /* 모바일 사이드바 내부에서는 중복 헤더 제거 */
   }
 }
 
