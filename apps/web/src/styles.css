@@ -107,299 +107,60 @@ button {
   box-shadow: var(--shadow);
 }
 
-.workspace__header,
-.system-panel,
-.composer,
-.empty-state {
+.workspace__header {
   border-radius: 28px;
-  padding: 20px 22px;
+  padding: 12px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.eyebrow {
-  margin: 0 0 8px;
-  color: var(--muted);
-  text-transform: uppercase;
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+.header-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
 }
 
-h1,
-h2,
-h3,
-p {
+.header-title h2 {
+  font-size: 1.1rem;
+}
+
+.header-title .eyebrow {
   margin: 0;
+  white-space: nowrap;
 }
 
-.status-card {
-  border-radius: 22px;
-  padding: 16px;
-  display: flex;
-  gap: 14px;
-}
-
-.status-card p,
-.sidebar__empty,
-.conversation-item small,
-.placeholder,
-.composer__hint {
-  color: var(--muted);
-}
-
-.status-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  margin-top: 5px;
-  background: #7b7b7b;
-  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.04);
-}
-
-.status-dot--connected {
-  background: #56d480;
-}
-
-.status-dot--upstream_degraded {
-  background: #d4c14a;
-}
-
-.status-dot--degraded {
-  background: #f4b257;
-}
-
-.status-dot--missing {
-  background: #ff7a6b;
-}
-
-.field-label {
-  display: grid;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 0.92rem;
-}
-
-.field-label--stacked textarea,
-.endpoint-input,
-.composer textarea {
-  border-radius: 20px;
-  border: 1px solid rgba(255, 244, 224, 0.11);
-  background: rgba(10, 10, 10, 0.26);
-  color: var(--text);
-  padding: 14px 16px;
-  resize: vertical;
-}
-
-.endpoint-input {
-  flex: 1;
-}
-
-.conversation-list {
-  display: grid;
-  gap: 10px;
-  overflow: auto;
-  padding-right: 4px;
-  min-height: 0;
-  flex: 1;
-}
-
-.conversation-item {
-  border-radius: 18px;
-  padding: 6px;
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-  position: relative;
-}
-
-.conversation-item__button {
-  flex: 1;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  display: grid;
-  gap: 6px;
-  padding: 8px 10px;
-}
-
-.conversation-item.is-active {
-  border-color: rgba(236, 143, 58, 0.4);
-  background: linear-gradient(180deg, rgba(236, 143, 58, 0.2), rgba(236, 143, 58, 0.08));
-}
-
-.conversation-item__delete {
-  align-self: center;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  padding: 4px 8px;
-}
-
-.ghost-button,
-.primary-button,
-.danger-button,
-.model-pill {
-  border: 1px solid transparent;
-  border-radius: 999px;
-  padding: 10px 14px;
-  transition: 160ms ease;
-}
-
-.ghost-button {
-  background: var(--panel-soft);
-  color: var(--text);
-}
-
-.primary-button {
-  background: var(--accent);
-  color: #17120d;
-  font-weight: 700;
-}
-
-.danger-button {
-  background: rgba(255, 122, 107, 0.16);
-  color: #ffd8d3;
-}
-
-.model-switcher {
+.workspace-config {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  align-items: flex-end;
 }
 
-.model-switcher__row {
+.config-row {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
 }
 
-.model-pill {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-}
-
-.model-pill.is-active {
-  border-color: rgba(236, 143, 58, 0.5);
-  background: var(--accent-soft);
-}
-
-.model-pill:disabled,
-.ghost-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.chat-thread {
+.endpoint-row {
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  display: grid;
-  gap: 20px;
-  align-content: start;
-  padding: 6px 8px 18px 4px;
-  overscroll-behavior: contain;
-  scroll-behavior: smooth;
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
 
-.chat-thread__anchor {
-  height: 1px;
-}
-
-.turn {
-  display: grid;
-  gap: 14px;
-}
-
-.bubble {
-  border-radius: 26px;
-  padding: 18px 20px;
-}
-
-.bubble--user {
-  background: linear-gradient(135deg, rgba(236, 143, 58, 0.24), rgba(236, 143, 58, 0.12));
-}
-
-.bubble__label {
-  display: inline-block;
-  margin-bottom: 10px;
-  color: var(--muted);
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.compare-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.single-response {
-  max-width: 920px;
-}
-
-.response-card {
-  border-radius: 24px;
-  padding: 18px 18px 20px;
-  min-height: 180px;
-}
-
-.response-card__body {
-  display: grid;
-  gap: 14px;
-  white-space: pre-wrap;
-  line-height: 1.65;
-}
-
-.response-state {
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.response-state--streaming {
-  background: rgba(236, 143, 58, 0.16);
-  color: #ffc98d;
-}
-
-.response-state--done {
-  background: rgba(86, 212, 128, 0.16);
-  color: #aaf0c0;
-}
-
-.response-state--error {
-  background: rgba(255, 122, 107, 0.16);
-  color: #ffd1cb;
-}
-
-.response-state--idle {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--muted);
-}
-
-.error-text {
-  color: #ffb0a7;
-}
-
-.empty-state {
-  align-self: center;
-  max-width: 720px;
-  display: grid;
-  gap: 12px;
+.toggle-button--small {
+  height: 38px;
+  padding: 0 12px;
+  white-space: nowrap;
 }
 
 .composer textarea {
   width: 100%;
-  min-height: 120px;
-}
-
-.composer {
-  z-index: 3;
-  backdrop-filter: blur(20px);
+  min-height: 44px;
+  max-height: 200px;
+  line-height: 1.5;
+  padding: 10px 16px;
 }
 
 .composer__actions {
@@ -510,6 +271,11 @@ p {
 @media (max-width: 1080px) {
   .mobile-header {
     display: flex;
+    padding: 8px 14px;
+  }
+
+  .mobile-header__title h1 {
+    font-size: 0.9rem;
   }
 
   .app-shell {
@@ -545,77 +311,102 @@ p {
     display: flex;
     flex-direction: column;
     height: 100%;
-    padding: 12px;
-    gap: 8px;
+    padding: 8px;
+    gap: 6px;
     min-height: 0;
   }
 
   .workspace__header {
-    padding: 12px 14px;
-    border-radius: 18px;
+    padding: 8px 12px;
+    border-radius: 16px;
     flex-shrink: 0;
   }
 
-  .workspace__header h2 {
-    font-size: 1rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .header-title {
+    gap: 8px;
+  }
+
+  .header-title h2 {
+    font-size: 0.9rem;
+  }
+
+  .header-title .eyebrow {
+    font-size: 0.6rem;
   }
 
   .workspace-config {
-    padding: 10px 14px;
+    padding: 6px 10px;
     background: var(--panel);
     border: 1px solid var(--line);
-    border-radius: 20px;
-    gap: 10px;
+    border-radius: 16px;
+    gap: 6px;
   }
 
   .config-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
   }
 
-  .config-row .field-label {
-    min-width: 0;
+  .endpoint-row {
+    flex: 1;
+    gap: 4px;
   }
 
-  .toggle-button {
-    width: 100%;
-    justify-content: center;
-    height: 38px;
+  .endpoint-input {
+    padding: 8px 10px;
+    font-size: 0.85rem;
   }
 
-  .system-panel {
-    display: block; /* 토글 상태에 따라 보여야 하므로 display:none 제거 */
+  .ghost-button--small,
+  .toggle-button--small {
+    padding: 0 10px;
+    font-size: 0.75rem;
+    height: 34px;
+  }
+
+  .model-pill {
+    padding: 4px 8px;
+    font-size: 0.7rem;
   }
 
   .chat-thread {
     flex: 1;
     min-height: 0;
     padding: 4px;
+    gap: 12px;
+  }
+
+  .bubble {
+    padding: 12px 14px;
+    border-radius: 20px;
+  }
+
+  .bubble__label {
+    font-size: 0.7rem;
+    margin-bottom: 4px;
   }
 
   .composer {
     flex-shrink: 0;
-    padding: 12px;
-    border-radius: 20px;
+    padding: 8px;
+    border-radius: 16px;
     margin-top: auto;
   }
 
   .composer textarea {
-    min-height: 80px; /* 모바일에서는 입력창 높이를 줄임 */
-    font-size: 0.95rem;
+    min-height: 44px;
+    font-size: 0.9rem;
+    padding: 10px 12px;
+    border-radius: 16px;
   }
 
-  .model-switcher {
-    gap: 4px;
+  .composer__footer {
+    padding: 4px 0 0;
   }
 
-  .model-pill {
-    padding: 6px 10px;
-    font-size: 0.78rem;
+  .composer__hint {
+    font-size: 0.7rem;
   }
 }
 

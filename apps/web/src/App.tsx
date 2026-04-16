@@ -42,7 +42,6 @@ const MODEL_LABELS: Record<ModelKind, string> = {
   all: 'All',
   gemma26: 'Gemma 4 26B',
   gemmae4: 'Gemma 4 E4B',
-  gemma_all: 'Gemma All',
 };
 
 const RESPONSE_MODELS: ResponseModel[] = ['deepseek', 'qwen', 'gemma26', 'gemmae4'];
@@ -51,7 +50,7 @@ const COMPARE_DEEPSEEK_QWEN: ResponseModel[] = ['deepseek', 'qwen'];
 const COMPARE_GEMMA: ResponseModel[] = ['gemma26', 'gemmae4'];
 
 const MODEL_GROUP_DEEPSEEK_QWEN: ModelKind[] = ['deepseek', 'qwen', 'all'];
-const MODEL_GROUP_GEMMA: ModelKind[] = ['gemma26', 'gemmae4', 'gemma_all'];
+const MODEL_GROUP_GEMMA: ModelKind[] = ['gemma26', 'gemmae4'];
 
 const DEFAULT_MODELS: ModelInfo[] = [
   { id: 'deepseek', label: 'DeepSeek', available: true },
@@ -59,7 +58,6 @@ const DEFAULT_MODELS: ModelInfo[] = [
   { id: 'all', label: 'All', available: true },
   { id: 'gemma26', label: 'Gemma 4 26B', available: true },
   { id: 'gemmae4', label: 'Gemma 4 E4B', available: true },
-  { id: 'gemma_all', label: 'Gemma All', available: true },
 ];
 
 function modelsForGroup(allModels: ModelInfo[], group: ModelKind[]) {
@@ -101,10 +99,20 @@ export default function App() {
   const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const threadRef = useRef<HTMLElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const autoScrollRef = useRef(true);
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? null;
+
+  // 동적 입력창 높이 조절
+  useEffect(() => {
+    const textarea = composerRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [draft]);
 
   useEffect(() => {
     saveConversations(conversations);
@@ -479,8 +487,8 @@ export default function App() {
 
       <main className="workspace">
         <header className="workspace__header">
-          <div>
-            <p className="eyebrow">Live Compare</p>
+          <div className="header-title">
+            <span className="eyebrow">Live Compare</span>
             <h2>{selectedConversation?.title ?? '새 대화'}</h2>
           </div>
 
@@ -497,8 +505,6 @@ export default function App() {
                   {model.label}
                 </button>
               ))}
-            </div>
-            <div className="model-switcher__row">
               {modelsForGroup(models, MODEL_GROUP_GEMMA).map((model) => (
                 <button
                   key={model.id}
@@ -516,27 +522,24 @@ export default function App() {
 
         <section className="workspace-config">
           <div className="config-row">
-            <label className="field-label">
-              Gateway URL
-              <div className="endpoint-row">
-                <input
-                  className="endpoint-input"
-                  value={endpointDraft}
-                  onChange={(event) => setEndpointDraft(event.target.value)}
-                  placeholder="https://your-funnel-url.ts.net"
-                />
-                <button className="ghost-button ghost-button--small" onClick={handleApplyEndpoint} type="button">
-                  Apply
-                </button>
-              </div>
-            </label>
-            <button
-              className={`toggle-button ${isSystemPromptOpen ? 'is-active' : ''}`}
-              onClick={() => setIsSystemPromptOpen(!isSystemPromptOpen)}
-              type="button"
-            >
-              {isSystemPromptOpen ? 'Close System Prompt' : 'Open System Prompt'}
-            </button>
+            <div className="endpoint-row">
+              <input
+                className="endpoint-input"
+                value={endpointDraft}
+                onChange={(event) => setEndpointDraft(event.target.value)}
+                placeholder="Gateway URL"
+              />
+              <button className="ghost-button ghost-button--small" onClick={handleApplyEndpoint} type="button">
+                Apply
+              </button>
+              <button
+                className={`toggle-button toggle-button--small ${isSystemPromptOpen ? 'is-active' : ''}`}
+                onClick={() => setIsSystemPromptOpen(!isSystemPromptOpen)}
+                type="button"
+              >
+                {isSystemPromptOpen ? 'Prompt' : 'Prompt'}
+              </button>
+            </div>
           </div>
 
           {isSystemPromptOpen && (
@@ -546,8 +549,8 @@ export default function App() {
                 <textarea
                   value={systemPrompt}
                   onChange={(event) => setSystemPrompt(event.target.value)}
-                  placeholder="선택 사항입니다. 전체 대화 톤이나 역할을 지정할 수 있습니다."
-                  rows={3}
+                  placeholder="역할 지정"
+                  rows={2}
                 />
               </label>
             </div>
@@ -600,6 +603,7 @@ export default function App() {
 
         <footer className="composer">
           <textarea
+            ref={composerRef}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
@@ -609,7 +613,7 @@ export default function App() {
               }
             }}
             placeholder="프롬프트를 입력하세요. Shift+Enter로 줄바꿈합니다."
-            rows={4}
+            rows={1}
           />
           <div className="composer__footer">
             <div className="composer__hint">
