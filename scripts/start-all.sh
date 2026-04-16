@@ -155,8 +155,8 @@ elif [[ "${MAKI_NO_AUTO_DOWNGRADE:-0}" == "1" ]]; then
     exit 1
   }
 else
-  # E4B 우선: full(26B+E4B)보다 메모리 안정성이 높아 실사용 성공률이 높다
-  for _try in e4 full g3 dq2; do
+  # full 우선: Gemma 26B를 포함한 모든 모델 로드 시도
+  for _try in full e4 g3 dq2; do
     start_router_with_profile "$_try"
     if ! wait_for_http "http://127.0.0.1:${ROUTER_PORT}/v1/models" "router" "$ROUTER_WAIT_ROUNDS"; then
       echo "❌ 라우터 HTTP 대기 실패 (profile=$_try)" >&2
