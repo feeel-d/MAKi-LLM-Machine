@@ -98,6 +98,7 @@ export default function App() {
   const [models, setModels] = useState<ModelInfo[]>(DEFAULT_MODELS);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSystemPromptOpen, setIsSystemPromptOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const threadRef = useRef<HTMLElement | null>(null);
   const autoScrollRef = useRef(true);
@@ -513,16 +514,44 @@ export default function App() {
           </div>
         </header>
 
-        <section className="system-panel">
-          <label className="field-label field-label--stacked">
-            System Prompt
-            <textarea
-              value={systemPrompt}
-              onChange={(event) => setSystemPrompt(event.target.value)}
-              placeholder="선택 사항입니다. 전체 대화 톤이나 역할을 지정할 수 있습니다."
-              rows={3}
-            />
-          </label>
+        <section className="workspace-config">
+          <div className="config-row">
+            <label className="field-label">
+              Gateway URL
+              <div className="endpoint-row">
+                <input
+                  className="endpoint-input"
+                  value={endpointDraft}
+                  onChange={(event) => setEndpointDraft(event.target.value)}
+                  placeholder="https://your-funnel-url.ts.net"
+                />
+                <button className="ghost-button ghost-button--small" onClick={handleApplyEndpoint} type="button">
+                  Apply
+                </button>
+              </div>
+            </label>
+            <button
+              className={`toggle-button ${isSystemPromptOpen ? 'is-active' : ''}`}
+              onClick={() => setIsSystemPromptOpen(!isSystemPromptOpen)}
+              type="button"
+            >
+              {isSystemPromptOpen ? 'Close System Prompt' : 'Open System Prompt'}
+            </button>
+          </div>
+
+          {isSystemPromptOpen && (
+            <div className="system-panel animate-in">
+              <label className="field-label field-label--stacked">
+                System Prompt
+                <textarea
+                  value={systemPrompt}
+                  onChange={(event) => setSystemPrompt(event.target.value)}
+                  placeholder="선택 사항입니다. 전체 대화 톤이나 역할을 지정할 수 있습니다."
+                  rows={3}
+                />
+              </label>
+            </div>
+          )}
         </section>
 
         <section className="chat-thread" onScroll={handleThreadScroll} ref={threadRef}>

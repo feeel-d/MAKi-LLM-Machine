@@ -455,6 +455,58 @@ p {
   pointer-events: none;
 }
 
+.workspace-config {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.config-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.config-row .field-label {
+  flex: 1;
+  min-width: 240px;
+}
+
+.toggle-button {
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 16px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  transition: all 0.2s ease;
+  height: 42px;
+  display: flex;
+  align-items: center;
+}
+
+.toggle-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+.toggle-button.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: rgba(236, 143, 58, 0.4);
+}
+
+.animate-in {
+  animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (max-width: 1080px) {
   .mobile-header {
     display: flex;
@@ -511,8 +563,32 @@ p {
     text-overflow: ellipsis;
   }
 
+  .workspace-config {
+    padding: 10px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    gap: 10px;
+  }
+
+  .config-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .config-row .field-label {
+    min-width: 0;
+  }
+
+  .toggle-button {
+    width: 100%;
+    justify-content: center;
+    height: 38px;
+  }
+
   .system-panel {
-    display: none;
+    display: block; /* 토글 상태에 따라 보여야 하므로 display:none 제거 */
   }
 
   .chat-thread {
