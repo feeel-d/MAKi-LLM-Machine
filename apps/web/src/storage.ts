@@ -117,7 +117,7 @@ export function loadSelectedModel(): ModelKind {
   ) {
     return raw;
   }
-  return 'deepseek';
+  return 'gemmae4';
 }
 
 export function saveSelectedModel(value: ModelKind) {

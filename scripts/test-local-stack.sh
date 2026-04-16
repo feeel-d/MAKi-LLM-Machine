@@ -7,7 +7,7 @@ GATEWAY_URL="${GATEWAY_URL:-http://127.0.0.1:3001}"
 ROUTER_URL="${ROUTER_URL:-http://127.0.0.1:8081}"
 SKIP_ROUTER="${SKIP_ROUTER:-0}"
 SKIP_CHAT="${SKIP_CHAT:-0}"
-CHAT_MODEL="${CHAT_MODEL:-deepseek}"
+CHAT_MODEL="${CHAT_MODEL:-gemmae4}"
 
 echo "=== MAKi local stack smoke ==="
 echo "Gateway: $GATEWAY_URL  (health, models, optional chat stream model=$CHAT_MODEL)"

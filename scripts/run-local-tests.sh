@@ -8,7 +8,7 @@ echo "=== npm test (gateway 단위) ==="
 npm test
 
 echo ""
-echo "=== scripts/test-local-stack.sh (기본: deepseek) ==="
+echo "=== scripts/test-local-stack.sh (기본: gemmae4) ==="
 "$ROOT/scripts/test-local-stack.sh"
 
 echo ""

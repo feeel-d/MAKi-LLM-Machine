@@ -51,14 +51,14 @@ const COMPARE_DEEPSEEK_QWEN: ResponseModel[] = ['deepseek', 'qwen'];
 const COMPARE_GEMMA: ResponseModel[] = ['gemma26', 'gemmae4'];
 
 const MODEL_GROUP_DEEPSEEK_QWEN: ModelKind[] = ['deepseek', 'qwen', 'all'];
-const MODEL_GROUP_GEMMA: ModelKind[] = ['gemma26', 'gemmae4', 'gemma_all'];
+const MODEL_GROUP_GEMMA: ModelKind[] = ['gemmae4', 'gemma26', 'gemma_all'];
 
 const DEFAULT_MODELS: ModelInfo[] = [
   { id: 'deepseek', label: 'DeepSeek', available: true },
   { id: 'qwen', label: 'Qwen', available: true },
   { id: 'all', label: 'All', available: true },
-  { id: 'gemma26', label: 'Gemma 4 26B', available: true },
   { id: 'gemmae4', label: 'Gemma 4 E4B', available: true },
+  { id: 'gemma26', label: 'Gemma 4 26B', available: true },
   { id: 'gemma_all', label: 'Gemma All', available: true },
 ];
 
@@ -80,7 +80,7 @@ function primaryResponseModel(mode: ModelKind): ResponseModel {
     return 'deepseek';
   }
   if (mode === 'gemma_all') {
-    return 'gemma26';
+    return 'gemmae4';
   }
   return mode;
 }

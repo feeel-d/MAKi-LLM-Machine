@@ -1,4 +1,4 @@
-export const ROUTER_MODEL_IDS = ['deepseek', 'qwen', 'gemma26', 'gemmae4'];
+export const ROUTER_MODEL_IDS = ['deepseek', 'qwen', 'gemmae4', 'gemma26'];
 
 /** llama-server /v1/models 항목 — id만 있고 슬롯 로드 실패 시 status.failed / value !== loaded */
 export function isRouterSlotReady(entry) {
