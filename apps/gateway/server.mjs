@@ -140,7 +140,11 @@ async function handleModels(response) {
 
 async function handleChatStream(request, response) {
   const body = await readJsonBody(request, config.maxBodyBytes);
-  const model = normalizeModel(body.model);
+  const rawModel =
+    body.model === undefined || body.model === null || body.model === ''
+      ? 'gemmae4'
+      : body.model;
+  const model = normalizeModel(rawModel);
   if (!model) {
     sendJson(response, 400, { error: 'Invalid model.' });
     return;

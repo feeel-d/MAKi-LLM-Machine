@@ -40,13 +40,28 @@ export function getClientIp(request) {
   return request.socket.remoteAddress ?? 'unknown';
 }
 
+/** Tailscale Funnel HTTPS 또는 MagicDNS 등 *.ts.net 출처 (외부 PC·브라우저에서 게이트웨이 호출) */
+function isTailscaleOrigin(origin) {
+  try {
+    const u = new URL(origin);
+    return (u.protocol === 'https:' || u.protocol === 'http:') && u.hostname.endsWith('.ts.net');
+  } catch {
+    return false;
+  }
+}
+
 export function setCorsHeaders(request, response, allowedOrigins) {
   const origin = request.headers.origin;
   if (!origin) {
     return;
   }
 
-  if (allowedOrigins.has('*') || allowedOrigins.has(origin)) {
+  const allow =
+    allowedOrigins.has('*') ||
+    allowedOrigins.has(origin) ||
+    isTailscaleOrigin(origin);
+
+  if (allow) {
     response.setHeader('Access-Control-Allow-Origin', origin);
     response.setHeader('Access-Control-Allow-Credentials', 'true');
   }
