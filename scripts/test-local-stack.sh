@@ -31,6 +31,8 @@ echo "✅ GET /api/models"
 head -c 400 /tmp/maki-models.json
 echo ""
 
+VERIFY_PROFILE="${VERIFY_PROFILE:-dq2}"
+
 if [[ "$SKIP_ROUTER" != "1" ]]; then
   if ! curl -fsS "$ROUTER_URL/v1/models" >/tmp/maki-router-models.json 2>/tmp/maki-router.err; then
     echo "⚠️  GET $ROUTER_URL/v1/models 실패 (라우터만 꺼진 경우). SKIP_ROUTER=1 로 재실행하면 생략 가능."
@@ -40,6 +42,11 @@ if [[ "$SKIP_ROUTER" != "1" ]]; then
   echo "✅ GET llama-server /v1/models"
   head -c 600 /tmp/maki-router-models.json
   echo ""
+  echo "→ router-verify-slots (profile=$VERIFY_PROFILE)…"
+  if ! node "$(dirname "$0")/router-verify-slots.mjs" "$ROUTER_URL/v1/models" "$VERIFY_PROFILE"; then
+    echo "❌ 라우터 슬롯이 프로필 $VERIFY_PROFILE 기준으로 모두 loaded 가 아닙니다."
+    exit 1
+  fi
 fi
 
 if [[ "$SKIP_CHAT" != "1" ]]; then

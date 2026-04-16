@@ -1,4 +1,5 @@
 import { createSseParser, extractDeltaText } from './sse.mjs';
+import { isRouterSlotReady } from './models.mjs';
 
 export async function fetchRouterModels(config) {
   try {
@@ -11,7 +12,8 @@ export async function fetchRouterModels(config) {
     }
 
     const payload = await response.json();
-    return Array.isArray(payload?.data) ? payload.data : [];
+    const raw = Array.isArray(payload?.data) ? payload.data : [];
+    return raw.filter(isRouterSlotReady);
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Model lookup failed')) {
       throw error;
@@ -62,7 +64,17 @@ export async function streamChatCompletion({
 
     if (!response.ok || !response.body) {
       const text = await response.text();
-      throw new Error(text || `llama-server request failed with status ${response.status}`);
+      let message = text;
+      try {
+        const parsed = JSON.parse(text);
+        const inner = parsed?.error?.message ?? parsed?.message;
+        if (typeof inner === 'string' && inner.length > 0) {
+          message = inner;
+        }
+      } catch {
+        // keep raw text
+      }
+      throw new Error(message || `llama-server request failed with status ${response.status}`);
     }
 
     const reader = response.body.getReader();
