@@ -40,7 +40,9 @@ button {
 
 #root {
   height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
 }
 
@@ -48,7 +50,7 @@ button {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
   height: 100vh;
-  min-height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -77,12 +79,19 @@ button {
 
 .workspace {
   padding: 28px;
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   gap: 18px;
   min-height: 0;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
+}
+
+.workspace > header,
+.workspace > section,
+.workspace > footer {
+  flex-shrink: 0;
 }
 
 .workspace__header,
@@ -282,6 +291,7 @@ p {
 }
 
 .chat-thread {
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -388,8 +398,6 @@ p {
 }
 
 .composer {
-  position: sticky;
-  bottom: 0;
   z-index: 3;
   backdrop-filter: blur(20px);
 }
@@ -482,25 +490,56 @@ p {
   }
 
   .workspace {
-    height: calc(100vh - 60px); /* mobile-header height */
-    padding: 14px;
-    gap: 12px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 12px;
+    gap: 8px;
+    min-height: 0;
   }
 
   .workspace__header {
-    padding: 14px 18px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    flex-shrink: 0;
+  }
+
+  .workspace__header h2 {
+    font-size: 1rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .system-panel {
-    display: none; /* 모바일에서 공간 확보를 위해 시스템 프롬프트는 숨김 (필요시 사이드바 이동 고려) */
+    display: none;
   }
 
   .chat-thread {
-    padding-bottom: 100px;
+    flex: 1;
+    min-height: 0;
+    padding: 4px;
   }
 
-  .sidebar__header {
-    display: none; /* 모바일 사이드바 내부에서는 중복 헤더 제거 */
+  .composer {
+    flex-shrink: 0;
+    padding: 12px;
+    border-radius: 20px;
+    margin-top: auto;
+  }
+
+  .composer textarea {
+    min-height: 80px; /* 모바일에서는 입력창 높이를 줄임 */
+    font-size: 0.95rem;
+  }
+
+  .model-switcher {
+    gap: 4px;
+  }
+
+  .model-pill {
+    padding: 6px 10px;
+    font-size: 0.78rem;
   }
 }
 
