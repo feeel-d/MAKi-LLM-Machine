@@ -171,10 +171,18 @@ p {
 }
 
 .field-label {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   color: var(--muted);
   font-size: 0.92rem;
+  white-space: nowrap;
+}
+
+.field-label--stacked {
+  display: grid;
+  gap: 10px;
+  white-space: normal;
 }
 
 .field-label--stacked textarea,
@@ -186,6 +194,7 @@ p {
   color: var(--text);
   padding: 14px 16px;
   resize: vertical;
+  flex: 1;
 }
 
 .endpoint-input {
@@ -491,10 +500,27 @@ p {
 
 .config-row {
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   justify-content: space-between;
   gap: 16px;
-  flex-wrap: wrap;
+}
+
+.config-row--top {
+  flex-direction: column;
+}
+
+.config-row--actions {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.config-row--actions > * {
+  flex: 1;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .config-row .field-label {
@@ -600,9 +626,17 @@ p {
   }
 
   .config-row {
+    gap: 10px;
+  }
+
+  .config-row--top {
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
+  }
+
+  .config-row--actions {
+    flex-direction: row;
+    align-items: center;
   }
 
   .config-row .field-label {

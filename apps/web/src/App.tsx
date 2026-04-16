@@ -493,21 +493,22 @@ export default function App() {
         </header>
 
         <section className="workspace-config">
-          <div className="config-row">
+          <div className="config-row config-row--top">
             <label className="field-label">
               Gateway URL
-              <div className="endpoint-row">
-                <input
-                  className="endpoint-input"
-                  value={endpointDraft}
-                  onChange={(event) => setEndpointDraft(event.target.value)}
-                  placeholder="https://your-funnel-url.ts.net"
-                />
-                <button className="ghost-button ghost-button--small" onClick={handleApplyEndpoint} type="button">
-                  Apply
-                </button>
-              </div>
+              <input
+                className="endpoint-input"
+                value={endpointDraft}
+                onChange={(event) => setEndpointDraft(event.target.value)}
+                placeholder="https://your-funnel-url.ts.net"
+              />
             </label>
+          </div>
+
+          <div className="config-row config-row--actions">
+            <button className="ghost-button" onClick={handleApplyEndpoint} type="button">
+              Apply
+            </button>
             <button
               className={`toggle-button ${isSystemPromptOpen ? 'is-active' : ''}`}
               onClick={() => setIsSystemPromptOpen(!isSystemPromptOpen)}
