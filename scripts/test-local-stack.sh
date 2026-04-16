@@ -66,6 +66,16 @@ if [[ "$SKIP_CHAT" != "1" ]]; then
     echo "$out" | head -c 800
     exit 1
   fi
+  if [[ "$out" == *"event: error"* ]]; then
+    echo "❌ SSE error 이벤트 감지:"
+    echo "$out" | head -n 40
+    exit 1
+  fi
+  if [[ "$out" == *'"error":"Rate limit exceeded."'* ]]; then
+    echo "❌ rate limit 발생 — 잠시 후 재시도하세요."
+    echo "$out" | head -n 20
+    exit 1
+  fi
   echo "✅ SSE 수신 (chat stream)"
   echo "$out" | head -n 15
 fi

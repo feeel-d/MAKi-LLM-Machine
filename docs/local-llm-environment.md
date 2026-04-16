@@ -158,3 +158,4 @@ llama.cpp:      ~/llama.cpp/build/bin/
 2. **Tailscale Funnel:** `tailscale funnel --bg 3001` (`scripts/start-funnel.sh` 동일). `tailscale funnel status` 의 `https://....ts.net` 를 브라우저 Gateway URL에 넣는다 (게이트웨이 포트와 동일해야 함).
 3. **nginx가 443/80 앞단일 때:** 전역 `301` 으로 `app.markhub.ai` 등으로 몰면 GitHub Pages 프론트가 API JSON 대신 HTML/리다이렉트를 받는다. `location ^~ /api/` 는 `proxy_pass http://127.0.0.1:3001;` 로 두거나, Funnel 전용 호스트만 게이트웨이에 붙인다. 레포 참고: `deploy/macos/nginx-maki-ink-api-proxy.conf`.
 4. **라우터 포트:** 기본 `8081` (`ROUTER_PORT`). nginx·다른 서비스가 8080을 쓰는 경우와 충돌하지 않게 맞춘다. Gemma 없이 DeepSeek+Qwen만 쓰려면 `MAKI_ROUTER_PROFILE=dq2` (`scripts/run-llama-router.sh`).
+5. **Gemma4 아키텍처 오류:** `unknown model architecture: "gemma4"` 이면 llama.cpp를 최신으로 다시 빌드해야 한다. `./scripts/update-llama-cpp.sh` 실행 후 `./scripts/stop-all.sh && ./scripts/start-all.sh`, 그리고 `VERIFY_PROFILE=e4 CHAT_MODEL=gemmae4 npm run test:local` 로 확인.

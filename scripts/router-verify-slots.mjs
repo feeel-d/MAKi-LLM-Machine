@@ -11,6 +11,7 @@ const profile = process.argv[3] ?? 'full';
 const required = {
   full: ['deepseek', 'qwen', 'gemma26', 'gemmae4'],
   g3: ['deepseek', 'qwen', 'gemma26'],
+  e4: ['deepseek', 'qwen', 'gemmae4'],
   dq2: ['deepseek', 'qwen'],
 };
 
