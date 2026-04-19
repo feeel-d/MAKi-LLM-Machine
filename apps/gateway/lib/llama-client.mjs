@@ -142,7 +142,7 @@ export async function completeJsonCompletion({
       return {
         requestId: requestId ?? crypto.randomUUID(),
         text,
-        parsed: parseJsonObjectFromModelText(text),
+        parsed: parseJsonObjectFromModelTextSafe(text),
       };
     } catch (error) {
       lastError = error;
@@ -154,6 +154,14 @@ export async function completeJsonCompletion({
   }
 
   throw lastError;
+}
+
+function parseJsonObjectFromModelTextSafe(value) {
+  try {
+    return parseJsonObjectFromModelText(value);
+  } catch {
+    return null;
+  }
 }
 
 /** Node undici 등에서 흔한 "fetch failed"를 그대로 쓰면 Gemma E4B만 실패한 것처럼 보여도, 실제는 라우터 연결/슬롯 로드 문제인 경우가 많음 */

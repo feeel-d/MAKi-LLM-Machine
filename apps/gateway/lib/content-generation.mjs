@@ -38,7 +38,7 @@ export function createContentGenerationService(dependencies = {}) {
         ],
       });
 
-      const title = validateTitleOutput(completion.parsed?.title, normalized.maxLength);
+      const title = validateTitleOutput(completion.parsed?.title ?? completion.text, normalized.maxLength);
       return {
         title,
         model: CONTENT_TASK_MODELS.titleFromText,
@@ -80,7 +80,7 @@ export function createContentGenerationService(dependencies = {}) {
         ],
       });
 
-      const title = validateTitleOutput(completion.parsed?.title, normalized.maxLength);
+      const title = validateTitleOutput(completion.parsed?.title ?? completion.text, normalized.maxLength);
       return {
         title,
         model: CONTENT_TASK_MODELS.titleFromImage,
@@ -122,7 +122,7 @@ export function createContentGenerationService(dependencies = {}) {
         ],
       });
 
-      const body = validateBodyOutput(completion.parsed?.body);
+      const body = validateBodyOutput(completion.parsed?.body ?? completion.text);
       return {
         body,
         model: CONTENT_TASK_MODELS.bodyFromImage,
@@ -200,34 +200,14 @@ export function validateBodyFromImageInput(input) {
 }
 
 export function buildTitleFromTextPrompt(input) {
-  const styleLabel = input.style;
   const languageLabel = input.language === 'en' ? 'English' : 'Korean';
-
-  return [
-    'Generate exactly one title from the text.',
-    `Language: ${languageLabel}.`,
-    `Style: ${styleLabel}.`,
-    `Max length: ${input.maxLength} characters.`,
-    'Return JSON only with this shape: {"title":"..."}',
-    `Text:\n${input.text}`,
-  ].join('\n');
+  return `Create one ${languageLabel} title (${input.style}, max ${input.maxLength} chars). Return JSON: {"title":"..."}\n${input.text}`;
 }
 
 export function buildTitleFromImagePrompt(input) {
   const languageLabel = input.language === 'en' ? 'English' : 'Korean';
-  const parts = [
-    'Analyze the image and create exactly one concise title.',
-    `Language: ${languageLabel}.`,
-    `Style: ${input.style}.`,
-    `Max length: ${input.maxLength} characters.`,
-    'Return JSON only with this shape: {"title":"..."}',
-  ];
-
-  if (input.contextText) {
-    parts.push(`Context:\n${input.contextText}`);
-  }
-
-  return parts.join('\n');
+  const context = input.contextText ? ` Context: ${input.contextText}` : '';
+  return `Create one ${languageLabel} title for this image (${input.style}, max ${input.maxLength} chars). Return JSON: {"title":"..."}${context}`;
 }
 
 export function buildBodyFromImagePrompt(input) {
@@ -239,21 +219,9 @@ export function buildBodyFromImagePrompt(input) {
         ? 'Write around 4-6 detailed paragraphs.'
         : 'Write around 2-4 paragraphs.';
 
-  const parts = [
-    'Analyze the image and write a coherent article body.',
-    `Language: ${languageLabel}.`,
-    lengthGuide,
-    'Return JSON only with this shape: {"body":"..."}',
-  ];
-
-  if (input.titleHint) {
-    parts.push(`Title hint: ${input.titleHint}`);
-  }
-  if (input.tone) {
-    parts.push(`Tone: ${input.tone}`);
-  }
-
-  return parts.join('\n');
+  const titleHint = input.titleHint ? ` Title hint: ${input.titleHint}.` : '';
+  const tone = input.tone ? ` Tone: ${input.tone}.` : '';
+  return `Write a ${languageLabel} article body from this image. ${lengthGuide} Return JSON: {"body":"..."}${titleHint}${tone}`;
 }
 
 export async function ensureModelAvailable(config, modelId, fetchModels = fetchRouterModels) {
@@ -352,4 +320,3 @@ function asString(value) {
   }
   return value.trim();
 }
-
