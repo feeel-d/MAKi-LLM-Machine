@@ -4,6 +4,7 @@ import path from 'node:path';
 import { CapacityQueue } from './lib/capacity-queue.mjs';
 import { loadConfig } from './lib/config.mjs';
 import { readJsonBody, getClientIp, sendJson, setCorsHeaders } from './lib/http.mjs';
+import { createInternalContentRouter } from './lib/internal-content-routes.mjs';
 import { fetchRouterModels, streamChatCompletion } from './lib/llama-client.mjs';
 import { ROUTER_MODEL_IDS, normalizeModel, resolveTargetModels } from './lib/models.mjs';
 import { RateLimiter } from './lib/rate-limiter.mjs';
@@ -22,19 +23,27 @@ const queue = new CapacityQueue({
 const repoRoot = process.cwd();
 const webBasePath = '/MAKi-LLM-Machine';
 const webDistPath = path.join(repoRoot, 'apps', 'web', 'dist');
+const handleInternalContentRoute = createInternalContentRouter({ config, queue });
 
 const server = http.createServer(async (request, response) => {
-  setCorsHeaders(request, response, config.allowedOrigins);
+  const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
+  const isInternalRoute = url.pathname.startsWith('/internal/');
+
+  if (!isInternalRoute) {
+    setCorsHeaders(request, response, config.allowedOrigins);
+  }
 
   if (request.method === 'OPTIONS') {
-    response.writeHead(200);
+    response.writeHead(isInternalRoute ? 204 : 200);
     response.end();
     return;
   }
 
-  const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
-
   try {
+    if (await handleInternalContentRoute(request, response, url.pathname)) {
+      return;
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/health') {
       await handleHealth(response);
       return;

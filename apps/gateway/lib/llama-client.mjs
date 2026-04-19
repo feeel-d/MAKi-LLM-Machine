@@ -116,6 +116,46 @@ export async function streamChatCompletion({
   }
 }
 
+export async function completeJsonCompletion({
+  config,
+  model,
+  messages,
+  temperature,
+  maxTokens,
+  systemPrompt,
+  requestId,
+  retryCount = 1,
+}) {
+  const maxAttempts = Math.max(1, Number(retryCount) + 1);
+  let lastError;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const text = await requestChatText({
+        config,
+        model,
+        messages,
+        systemPrompt,
+        temperature,
+        maxTokens,
+      });
+      return {
+        requestId: requestId ?? crypto.randomUUID(),
+        text,
+        parsed: parseJsonObjectFromModelText(text),
+      };
+    } catch (error) {
+      lastError = error;
+
+      if (attempt >= maxAttempts) {
+        break;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 /** Node undici 등에서 흔한 "fetch failed"를 그대로 쓰면 Gemma E4B만 실패한 것처럼 보여도, 실제는 라우터 연결/슬롯 로드 문제인 경우가 많음 */
 function formatUpstreamFetchError(error, llamaServerUrl) {
   const base =
@@ -162,6 +202,148 @@ function buildHeaders(config) {
   }
 
   return headers;
+}
+
+async function requestChatText({
+  config,
+  model,
+  messages,
+  temperature,
+  maxTokens,
+  systemPrompt,
+}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort('timeout'), config.requestTimeoutMs);
+
+  try {
+    const response = await fetch(new URL('/v1/chat/completions', config.llamaServerUrl), {
+      method: 'POST',
+      headers: {
+        ...buildHeaders(config),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: injectSystemPrompt(messages, systemPrompt),
+        stream: false,
+        temperature: typeof temperature === 'number' ? temperature : 0.4,
+        max_tokens: typeof maxTokens === 'number' ? maxTokens : 512,
+        response_format: {
+          type: 'json_object',
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      let message = text;
+      try {
+        const parsed = JSON.parse(text);
+        const inner = parsed?.error?.message ?? parsed?.message;
+        if (typeof inner === 'string' && inner.length > 0) {
+          message = inner;
+        }
+      } catch {
+        // keep raw text
+      }
+      throw new Error(message || `llama-server request failed with status ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const outputText = extractResponseText(payload).trim();
+    if (!outputText) {
+      throw new Error('Model returned empty content.');
+    }
+
+    return outputText;
+  } catch (error) {
+    throw new Error(formatUpstreamFetchError(error, config.llamaServerUrl));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export function parseJsonObjectFromModelText(value) {
+  const input = String(value ?? '').trim();
+  if (!input) {
+    throw new Error('Model returned empty JSON content.');
+  }
+
+  const raw = unwrapCodeFence(input);
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Model output JSON must be an object.');
+    }
+    return parsed;
+  } catch {
+    const first = raw.indexOf('{');
+    const last = raw.lastIndexOf('}');
+    if (first === -1 || last === -1 || last <= first) {
+      throw new Error('Model did not return valid JSON.');
+    }
+
+    const sliced = raw.slice(first, last + 1);
+    const parsed = JSON.parse(sliced);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('Model output JSON must be an object.');
+    }
+    return parsed;
+  }
+}
+
+function unwrapCodeFence(value) {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('```')) {
+    return trimmed;
+  }
+
+  const lines = trimmed.split('\n');
+  if (lines.length < 2) {
+    return trimmed;
+  }
+
+  if (lines[0].startsWith('```')) {
+    lines.shift();
+  }
+  if (lines.length > 0 && lines[lines.length - 1].startsWith('```')) {
+    lines.pop();
+  }
+  return lines.join('\n').trim();
+}
+
+function extractResponseText(payload) {
+  const choice = payload?.choices?.[0];
+  if (!choice) {
+    return '';
+  }
+
+  if (typeof choice.text === 'string') {
+    return choice.text;
+  }
+
+  const message = choice.message ?? choice.delta ?? {};
+  const content = message.content;
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => {
+        if (typeof item === 'string') {
+          return item;
+        }
+        if (typeof item?.text === 'string') {
+          return item.text;
+        }
+        return '';
+      })
+      .join('');
+  }
+
+  return '';
 }
 
 function injectSystemPrompt(messages, systemPrompt) {

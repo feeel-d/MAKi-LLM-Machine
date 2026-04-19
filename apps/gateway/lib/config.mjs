@@ -16,6 +16,13 @@ export function loadConfig() {
       .filter(Boolean),
   );
 
+  const allowedImageMime = new Set(
+    (process.env.ALLOWED_IMAGE_MIME ?? 'image/jpeg,image/png,image/webp,image/gif')
+      .split(',')
+      .map((mime) => mime.trim().toLowerCase())
+      .filter(Boolean),
+  );
+
   return {
     host: process.env.GATEWAY_HOST ?? '127.0.0.1',
     port: readNumber('GATEWAY_PORT', 3001),
@@ -29,5 +36,10 @@ export function loadConfig() {
     queueMaxPending: readNumber('QUEUE_MAX_PENDING', 8),
     requestTimeoutMs: readNumber('REQUEST_TIMEOUT_MS', 180_000),
     maxBodyBytes: readNumber('MAX_BODY_BYTES', 65_536),
+    serviceApiKey: process.env.SERVICE_API_KEY ?? '',
+    contentRetryCount: readNumber('CONTENT_RETRY_COUNT', 1),
+    imageFetchTimeoutMs: readNumber('IMAGE_FETCH_TIMEOUT_MS', 15_000),
+    maxImageBytes: readNumber('MAX_IMAGE_BYTES', 8 * 1024 * 1024),
+    allowedImageMime,
   };
 }
