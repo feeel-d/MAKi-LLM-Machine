@@ -1,4 +1,4 @@
-export const ROUTER_MODEL_IDS = ['deepseek', 'qwen', 'gemmae4', 'gemma26'];
+export const ROUTER_MODEL_IDS = ['gemmae4', 'gemma26'];
 
 /** llama-server /v1/models 항목 — id만 있고 슬롯 로드 실패 시 status.failed / value !== loaded */
 export function isRouterSlotReady(entry) {
@@ -41,14 +41,7 @@ export function isRouterSlotRegistered(entry) {
 }
 
 export function normalizeModel(value) {
-  if (
-    value === 'deepseek' ||
-    value === 'qwen' ||
-    value === 'all' ||
-    value === 'gemma26' ||
-    value === 'gemmae4' ||
-    value === 'gemma_all'
-  ) {
+  if (value === 'gemma26' || value === 'gemmae4' || value === 'gemma_all') {
     return value;
   }
 
@@ -56,10 +49,6 @@ export function normalizeModel(value) {
 }
 
 export function resolveTargetModels(model) {
-  if (model === 'all') {
-    return ['deepseek', 'qwen'];
-  }
-
   if (model === 'gemma_all') {
     return ['gemma26', 'gemmae4'];
   }

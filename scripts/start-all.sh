@@ -107,15 +107,14 @@ start_background() {
   echo "Started $label with PID $pid"
 }
 
-start_router_with_profile() {
-  local profile="$1"
+start_router() {
   stop_router
-  echo "Starting llama router with MAKI_ROUTER_PROFILE=$profile …"
+  echo "Starting llama router (Gemma 26B + E4B) …"
   : >"$ROUTER_LOG_FILE"
-  nohup env MAKI_ROUTER_PROFILE="$profile" "$ROOT_DIR/scripts/run-llama-router.sh" >>"$ROUTER_LOG_FILE" 2>&1 &
+  nohup "$ROOT_DIR/scripts/run-llama-router.sh" >>"$ROUTER_LOG_FILE" 2>&1 &
   local pid=$!
   echo "$pid" >"$ROUTER_PID_FILE"
-  echo "Started router with PID $pid (profile=$profile)"
+  echo "Started router with PID $pid"
 }
 
 verify_slots() {
@@ -139,44 +138,17 @@ wait_for_slots() {
   verify_slots "$profile"
 }
 
-# --- Router: 자동 프로필(e4→g3→dq2) 또는 MAKI_ROUTER_PROFILE 고정 ---
-if [[ -n "${MAKI_ROUTER_PROFILE:-}" ]]; then
-  start_router_with_profile "$MAKI_ROUTER_PROFILE"
-  wait_for_http "http://127.0.0.1:${ROUTER_PORT}/v1/models" "router" "$ROUTER_WAIT_ROUNDS"
-  wait_for_slots "$MAKI_ROUTER_PROFILE" || {
-    echo "❌ 라우터 슬롯 검증 실패 (profile=$MAKI_ROUTER_PROFILE). 로그: $ROUTER_LOG_FILE" >&2
-    exit 1
-  }
-elif [[ "${MAKI_NO_AUTO_DOWNGRADE:-0}" == "1" ]]; then
-  start_router_with_profile e4
-  wait_for_http "http://127.0.0.1:${ROUTER_PORT}/v1/models" "router" "$ROUTER_WAIT_ROUNDS"
-  wait_for_slots e4 || {
-    echo "❌ e4 프로필 슬롯 검증 실패. MAKI_NO_AUTO_DOWNGRADE=1 이라 자동 전환 안 함." >&2
-    exit 1
-  }
-else
-  # e4 우선: DeepSeek + Qwen + 멀티모달 이미지 슬롯만 올려 메모리 압박을 낮춤
-  for _try in e4 g3 dq2; do
-    start_router_with_profile "$_try"
-    if ! wait_for_http "http://127.0.0.1:${ROUTER_PORT}/v1/models" "router" "$ROUTER_WAIT_ROUNDS"; then
-      echo "❌ 라우터 HTTP 대기 실패 (profile=$_try)" >&2
-      if [[ "$_try" == "dq2" ]]; then
-        exit 1
-      fi
-      continue
-    fi
-    if wait_for_slots "$_try"; then
-      export MAKI_ROUTER_PROFILE="$_try"
-      echo "✅ 라우터 프로필 확정: $_try (슬롯 모두 loaded)"
-      break
-    fi
-    echo "⚠️  profile=$_try 일부 슬롯 미로드 — 다음 프로필로 전환…"
-    if [[ "$_try" == "dq2" ]]; then
-      echo "❌ dq2 까지 실패. GGUF 경로·메모리·llama.cpp 로그 확인: $ROUTER_LOG_FILE" >&2
-      exit 1
-    fi
-  done
+# --- Router: Gemma 26B + E4B (2 slots) ---
+start_router
+if ! wait_for_http "http://127.0.0.1:${ROUTER_PORT}/v1/models" "router" "$ROUTER_WAIT_ROUNDS"; then
+  echo "❌ 라우터 HTTP 대기 실패. 로그: $ROUTER_LOG_FILE" >&2
+  exit 1
 fi
+if ! wait_for_slots full; then
+  echo "❌ 라우터 슬롯 검증 실패 (필요: gemma26, gemmae4). GGUF·메모리·로그: $ROUTER_LOG_FILE" >&2
+  exit 1
+fi
+echo "✅ 라우터 슬롯: gemma26, gemmae4 loaded"
 
 # --- Embedding server (nomic @ 8083, 채팅 라우터와 분리) ---
 EMBED_PORT="${EMBED_PORT:-8083}"

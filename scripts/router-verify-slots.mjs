@@ -9,10 +9,7 @@ const url = process.argv[2] ?? 'http://127.0.0.1:8081/v1/models';
 const profile = process.argv[3] ?? 'full';
 
 const required = {
-  full: ['deepseek', 'qwen', 'gemma26', 'gemmae4'],
-  g3: ['deepseek', 'qwen', 'gemma26'],
-  e4: ['deepseek', 'qwen', 'gemmae4'],
-  dq2: ['deepseek', 'qwen'],
+  full: ['gemma26', 'gemmae4'],
 };
 
 function isLoaded(m) {

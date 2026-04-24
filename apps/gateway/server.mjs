@@ -116,13 +116,6 @@ async function handleModels(response) {
 
     sendJson(response, 200, {
       data: [
-        { id: 'deepseek', label: 'DeepSeek', available: available.has('deepseek') },
-        { id: 'qwen', label: 'Qwen', available: available.has('qwen') },
-        {
-          id: 'all',
-          label: 'All',
-          available: available.has('deepseek') && available.has('qwen'),
-        },
         { id: 'gemma26', label: 'Gemma 4 26B', available: available.has('gemma26') },
         { id: 'gemmae4', label: 'Gemma 4 E4B', available: available.has('gemmae4') },
         {
@@ -135,9 +128,6 @@ async function handleModels(response) {
   } catch (error) {
     sendJson(response, 200, {
       data: [
-        { id: 'deepseek', label: 'DeepSeek', available: false },
-        { id: 'qwen', label: 'Qwen', available: false },
-        { id: 'all', label: 'All', available: false },
         { id: 'gemma26', label: 'Gemma 4 26B', available: false },
         { id: 'gemmae4', label: 'Gemma 4 E4B', available: false },
         { id: 'gemma_all', label: 'Gemma All', available: false },
@@ -165,7 +155,7 @@ async function handleChatStream(request, response) {
   }
 
   const clientIp = getClientIp(request);
-  const cost = model === 'all' || model === 'gemma_all' ? 2 : 1;
+  const cost = model === 'gemma_all' ? 2 : 1;
 
   if (!rateLimiter.allow(clientIp, cost)) {
     sendJson(response, 429, { error: 'Rate limit exceeded.' });
@@ -197,7 +187,7 @@ async function handleChatStream(request, response) {
             config,
             model: targetModel,
             messages:
-              (model === 'all' || model === 'gemma_all') && body.messagesByModel?.[targetModel]
+              model === 'gemma_all' && body.messagesByModel?.[targetModel]
                 ? body.messagesByModel[targetModel]
                 : body.messages,
             systemPrompt: body.systemPrompt,

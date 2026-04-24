@@ -93,10 +93,10 @@ test('bodyFromImage defaults to medium length', async () => {
   assert.equal(calls[0].maxTokens, 760);
 });
 
-test('proofreadFromText uses deepseek and returns normalized corrected text', async () => {
+test('proofreadFromText uses gemmae4 and returns normalized corrected text', async () => {
   const calls = [];
   const service = createContentGenerationService({
-    fetchRouterModels: async () => [{ id: 'deepseek' }],
+    fetchRouterModels: async () => [{ id: 'gemmae4' }],
     completeJsonCompletion: async (payload) => {
       calls.push(payload);
       return { parsed: { correctedText: '교정된 문장' } };
@@ -113,10 +113,10 @@ test('proofreadFromText uses deepseek and returns normalized corrected text', as
     },
   });
 
-  assert.equal(result.model, 'deepseek');
+  assert.equal(result.model, 'gemmae4');
   assert.equal(result.correctedText, '교정된 문장');
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].model, 'deepseek');
+  assert.equal(calls[0].model, 'gemmae4');
   assert.match(calls[0].messages[0].content, /Proofread the following text/i);
 });
 
@@ -132,7 +132,7 @@ test('validateTitleFromTextInput rejects invalid style', () => {
 
 test('titleFromText returns 503 when required model is missing', async () => {
   const service = createContentGenerationService({
-    fetchRouterModels: async () => [{ id: 'qwen' }],
+    fetchRouterModels: async () => [{ id: 'gemma26' }],
     completeJsonCompletion: async () => ({ parsed: { title: 'unused' } }),
   });
 
@@ -152,7 +152,7 @@ test('titleFromText returns 503 when required model is missing', async () => {
 
 test('proofreadFromText returns 503 when required model is missing', async () => {
   const service = createContentGenerationService({
-    fetchRouterModels: async () => [{ id: 'qwen' }],
+    fetchRouterModels: async () => [{ id: 'gemma26' }],
     completeJsonCompletion: async () => ({ parsed: { correctedText: 'unused' } }),
   });
 

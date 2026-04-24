@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 로컬 게이트웨이 + (선택) 라우터 HTTP 스모크. DeepSeek/Qwen 단일 모델 스트림으로 검증.
+# 로컬 게이트웨이 + (선택) 라우터 HTTP 스모크. Gemma E4B 단일 모델 스트림으로 검증.
 # 사전: ./scripts/start-all.sh 또는 router(8081) + gateway(3001) 기동
 set -euo pipefail
 
@@ -31,7 +31,7 @@ echo "✅ GET /api/models"
 head -c 400 /tmp/maki-models.json
 echo ""
 
-VERIFY_PROFILE="${VERIFY_PROFILE:-dq2}"
+VERIFY_PROFILE="${VERIFY_PROFILE:-full}"
 
 if [[ "$SKIP_ROUTER" != "1" ]]; then
   if ! curl -fsS "$ROUTER_URL/v1/models" >/tmp/maki-router-models.json 2>/tmp/maki-router.err; then

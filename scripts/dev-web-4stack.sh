@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DeepSeek + Qwen + Gemma26 + GemmaE4 라우터, 게이트웨이, Vite 웹을 로컬에서 기동합니다.
+# Gemma 26B + E4B 라우터, 게이트웨이, Vite 웹을 로컬에서 기동합니다.
 # 사용: 리포 루트에서 ./scripts/dev-web-4stack.sh
 # 종료: Ctrl+C (자식 프로세스 그룹 종료)
 set -euo pipefail
@@ -17,8 +17,6 @@ need_file() {
   sz="$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f" 2>/dev/null || echo 0)"
   [[ -f "$f" ]] || return 1
   case "$f" in
-    */deepseek.gguf) [[ "$sz" -ge 8000000000 ]] ;;
-    */qwen.gguf) [[ "$sz" -ge 4000000000 ]] ;;
     */gemma4-26b.gguf) [[ "$sz" -ge 12000000000 ]] ;;
     */gemma4-e4b.gguf) [[ "$sz" -ge 5000000000 ]] ;; # Q4_K_M 전체 약 5.4GB
     *) [[ "$sz" -ge 1000000 ]] ;;
@@ -27,11 +25,10 @@ need_file() {
 
 mkdir -p "$RUNTIME_DIR"
 
-for name in deepseek.gguf qwen.gguf gemma4-26b.gguf gemma4-e4b.gguf; do
+for name in gemma4-26b.gguf gemma4-e4b.gguf; do
   if ! need_file "$MODELS_DIR/$name"; then
     echo "필요 파일 없음 또는 너무 작음: $MODELS_DIR/$name"
-    echo "Gemma가 없으면: ./scripts/download-gemma-models.sh (시간·용량 큼)"
-    echo "DeepSeek/Qwen은: ./setup-local-llm.sh 또는 기존 경로 확인"
+    echo "다운로드: ./setup-local-llm.sh 또는 ./scripts/download-gemma-models.sh"
     exit 1
   fi
 done
@@ -54,7 +51,7 @@ cd "$ROOT_DIR"
 export VITE_API_BASE_URL="http://127.0.0.1:${GATEWAY_PORT}"
 export LLAMA_SERVER_URL="${LLAMA_SERVER_URL:-http://127.0.0.1:${ROUTER_PORT}}"
 
-echo "Starting llama-server router (4 models)…"
+echo "Starting llama-server router (Gemma 26B + E4B)…"
 : >"$RUNTIME_DIR/router-dev.log"
 nohup "$ROOT_DIR/scripts/run-llama-router.sh" >>"$RUNTIME_DIR/router-dev.log" 2>&1 &
 ROUTER_PID=$!

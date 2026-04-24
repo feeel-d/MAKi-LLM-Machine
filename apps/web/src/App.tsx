@@ -37,26 +37,18 @@ function normalizeApiBaseUrl(value: string): string {
 const DEFAULT_API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL ?? '');
 
 const MODEL_LABELS: Record<ModelKind, string> = {
-  deepseek: 'DeepSeek',
-  qwen: 'Qwen',
-  all: 'All',
   gemma26: 'Gemma 4 26B',
   gemmae4: 'Gemma 4 E4B',
   gemma_all: 'Gemma All',
 };
 
-const RESPONSE_MODELS: ResponseModel[] = ['deepseek', 'qwen', 'gemma26', 'gemmae4'];
+const RESPONSE_MODELS: ResponseModel[] = ['gemma26', 'gemmae4'];
 
-const COMPARE_DEEPSEEK_QWEN: ResponseModel[] = ['deepseek', 'qwen'];
 const COMPARE_GEMMA: ResponseModel[] = ['gemma26', 'gemmae4'];
 
-const MODEL_GROUP_DEEPSEEK_QWEN: ModelKind[] = ['deepseek', 'qwen', 'all'];
-const MODEL_GROUP_GEMMA: ModelKind[] = ['gemmae4', 'gemma26', 'gemma_all'];
+const MODEL_GROUP: ModelKind[] = ['gemmae4', 'gemma26', 'gemma_all'];
 
 const DEFAULT_MODELS: ModelInfo[] = [
-  { id: 'deepseek', label: 'DeepSeek', available: true },
-  { id: 'qwen', label: 'Qwen', available: true },
-  { id: 'all', label: 'All', available: true },
   { id: 'gemmae4', label: 'Gemma 4 E4B', available: true },
   { id: 'gemma26', label: 'Gemma 4 26B', available: true },
   { id: 'gemma_all', label: 'Gemma All', available: true },
@@ -69,16 +61,13 @@ function modelsForGroup(allModels: ModelInfo[], group: ModelKind[]) {
 }
 
 function temperatureForMode(mode: ModelKind) {
-  if (mode === 'qwen' || mode === 'gemma26' || mode === 'gemmae4' || mode === 'gemma_all') {
+  if (mode === 'gemma26' || mode === 'gemmae4' || mode === 'gemma_all') {
     return 0.7;
   }
-  return 0.6;
+  return 0.7;
 }
 
 function primaryResponseModel(mode: ModelKind): ResponseModel {
-  if (mode === 'all') {
-    return 'deepseek';
-  }
   if (mode === 'gemma_all') {
     return 'gemmae4';
   }
@@ -268,17 +257,12 @@ export default function App() {
           model: selectedModel,
           messages: buildMessageHistory(priorTurns, primaryModel, prompt),
           messagesByModel:
-            selectedModel === 'all'
+            selectedModel === 'gemma_all'
               ? {
-                  deepseek: buildMessageHistory(priorTurns, 'deepseek', prompt),
-                  qwen: buildMessageHistory(priorTurns, 'qwen', prompt),
+                  gemma26: buildMessageHistory(priorTurns, 'gemma26', prompt),
+                  gemmae4: buildMessageHistory(priorTurns, 'gemmae4', prompt),
                 }
-              : selectedModel === 'gemma_all'
-                ? {
-                    gemma26: buildMessageHistory(priorTurns, 'gemma26', prompt),
-                    gemmae4: buildMessageHistory(priorTurns, 'gemmae4', prompt),
-                  }
-                : undefined,
+              : undefined,
           maxTokens: 768,
           temperature: temperatureForMode(selectedModel),
           systemPrompt: systemPrompt.trim() || undefined,
@@ -320,12 +304,7 @@ export default function App() {
     event: string,
     payload: StreamPayload,
   ) {
-    if (
-      payload.model !== 'deepseek' &&
-      payload.model !== 'qwen' &&
-      payload.model !== 'gemma26' &&
-      payload.model !== 'gemmae4'
-    ) {
+    if (payload.model !== 'gemma26' && payload.model !== 'gemmae4') {
       return;
     }
 
@@ -495,20 +474,7 @@ export default function App() {
 
           <div className="model-switcher">
             <div className="model-switcher__row">
-              {modelsForGroup(models, MODEL_GROUP_DEEPSEEK_QWEN).map((model) => (
-                <button
-                  key={model.id}
-                  type="button"
-                  disabled={!model.available || isStreaming}
-                  className={`model-pill ${selectedModel === model.id ? 'is-active' : ''}`}
-                  onClick={() => setSelectedModel(model.id)}
-                >
-                  {model.label}
-                </button>
-              ))}
-            </div>
-            <div className="model-switcher__row">
-              {modelsForGroup(models, MODEL_GROUP_GEMMA).map((model) => (
+              {modelsForGroup(models, MODEL_GROUP).map((model) => (
                 <button
                   key={model.id}
                   type="button"
@@ -573,13 +539,7 @@ export default function App() {
                   <p>{turn.prompt}</p>
                 </div>
 
-                {turn.mode === 'all' ? (
-                  <div className="compare-grid">
-                    {COMPARE_DEEPSEEK_QWEN.map((model) => (
-                      <ResponseCard key={model} model={model} response={turn.responses[model]} />
-                    ))}
-                  </div>
-                ) : turn.mode === 'gemma_all' ? (
+                {turn.mode === 'gemma_all' ? (
                   <div className="compare-grid">
                     {COMPARE_GEMMA.map((model) => (
                       <ResponseCard key={model} model={model} response={turn.responses[model]} />
@@ -598,10 +558,10 @@ export default function App() {
           ) : (
             <div className="empty-state">
               <p className="eyebrow">Ready</p>
-              <h3>DeepSeek·Qwen·Gemma를 한 화면에서 단일 또는 듀얼 비교로 테스트할 수 있습니다.</h3>
+              <h3>Gemma 4 (E4B / 26B)를 한 화면에서 단일 또는 듀얼 비교로 테스트할 수 있습니다.</h3>
               <p>
-                `All` 또는 `Gemma All`을 선택하면 같은 프롬프트를 두 모델에 동시에 보내고,
-                좌우 비교 카드에서 실시간 스트리밍으로 확인합니다.
+                <code>Gemma All</code>을 선택하면 동일 프롬프트를 26B와 E4B에 동시에 보내고, 좌우 비교 카드로 스트리밍을
+                확인합니다.
               </p>
             </div>
           )}
@@ -776,14 +736,6 @@ function createTurn(turnId: string, prompt: string, mode: ModelKind): Turn {
     mode,
     createdAt: Date.now(),
     responses: {
-      deepseek: {
-        text: '',
-        status: mode === 'deepseek' || mode === 'all' ? 'streaming' : 'idle',
-      },
-      qwen: {
-        text: '',
-        status: mode === 'qwen' || mode === 'all' ? 'streaming' : 'idle',
-      },
       gemma26: {
         text: '',
         status: mode === 'gemma26' || mode === 'gemma_all' ? 'streaming' : 'idle',

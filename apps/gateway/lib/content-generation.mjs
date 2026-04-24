@@ -2,7 +2,8 @@ import { completeJsonCompletion, fetchRouterModels, fetchTextEmbedding } from '.
 import { fetchImageAsDataUrl } from './image-ingest.mjs';
 import { InternalApiError } from './internal-errors.mjs';
 
-const ROUTER_MODEL_GEMMA_E4 = 'ggml-org/gemma-4-E4B-it-GGUF:Q4_K_M';
+/** llama-server 라우터 슬롯 id — title·proofread·todos·이미지 태스크 모두 E4B 슬롯 사용 */
+const ROUTER_SLOT_GEMMA_E4B = 'gemmae4';
 
 const TITLE_STYLES = new Set(['neutral', 'marketing', 'news']);
 const LANGUAGES = new Set(['ko', 'en']);
@@ -10,11 +11,11 @@ const BODY_LENGTHS = new Set(['short', 'medium', 'long']);
 const TODO_PRIORITIES = new Set(['HIGH', 'MEDIUM', 'LOW']);
 
 export const CONTENT_TASK_MODELS = {
-  titleFromText: ROUTER_MODEL_GEMMA_E4,
-  titleFromImage: ROUTER_MODEL_GEMMA_E4,
-  bodyFromImage: ROUTER_MODEL_GEMMA_E4,
-  proofreadFromText: 'deepseek',
-  todosFromText: 'deepseek',
+  titleFromText: ROUTER_SLOT_GEMMA_E4B,
+  titleFromImage: ROUTER_SLOT_GEMMA_E4B,
+  bodyFromImage: ROUTER_SLOT_GEMMA_E4B,
+  proofreadFromText: ROUTER_SLOT_GEMMA_E4B,
+  todosFromText: ROUTER_SLOT_GEMMA_E4B,
 };
 
 export function createContentGenerationService(dependencies = {}) {

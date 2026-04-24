@@ -27,5 +27,5 @@ test('isRouterSlotReady rejects default id', () => {
 });
 
 test('isRouterSlotReady rejects loading slot', () => {
-  assert.equal(isRouterSlotReady({ id: 'deepseek', status: { value: 'loading' } }), false);
+  assert.equal(isRouterSlotReady({ id: 'gemmae4', status: { value: 'loading' } }), false);
 });

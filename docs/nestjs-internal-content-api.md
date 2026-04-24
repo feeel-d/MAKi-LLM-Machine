@@ -27,7 +27,7 @@
 ```json
 {
   "title": "생성된 제목",
-  "model": "deepseek",
+  "model": "gemmae4",
   "requestId": "req-123",
   "latencyMs": 214
 }
@@ -100,7 +100,7 @@
 ```json
 {
   "correctedText": "교정된 본문",
-  "model": "deepseek",
+  "model": "gemmae4",
   "requestId": "req-127",
   "latencyMs": 305
 }
@@ -135,7 +135,7 @@
       "priority": "MEDIUM"
     }
   ],
-  "model": "deepseek",
+  "model": "gemmae4",
   "requestId": "req-126",
   "latencyMs": 512
 }

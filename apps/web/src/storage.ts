@@ -8,7 +8,17 @@ const STORAGE_KEYS = {
   apiBaseUrl: 'maki.apiBaseUrl',
 };
 
-const RESPONSE_KEYS: ResponseModel[] = ['deepseek', 'qwen', 'gemma26', 'gemmae4'];
+const RESPONSE_KEYS: ResponseModel[] = ['gemma26', 'gemmae4'];
+
+function normalizeModelKind(raw: string | undefined | null): ModelKind {
+  if (raw === 'gemma26' || raw === 'gemmae4' || raw === 'gemma_all') {
+    return raw;
+  }
+  if (raw === 'deepseek' || raw === 'qwen' || raw === 'all') {
+    return 'gemmae4';
+  }
+  return 'gemmae4';
+}
 
 function idleTurnResponse(): TurnResponse {
   return { text: '', status: 'idle' };
@@ -52,7 +62,7 @@ function migrateConversation(raw: unknown): Conversation | null {
       return {
         id: tr.id,
         prompt: tr.prompt,
-        mode: tr.mode as Turn['mode'],
+        mode: normalizeModelKind(tr.mode),
         createdAt: typeof tr.createdAt === 'number' ? tr.createdAt : Date.now(),
         responses: normalizeTurnResponses(tr.responses as Turn['responses'] | undefined),
       };
@@ -107,17 +117,7 @@ export function saveSelectedConversationId(value: string | null) {
 
 export function loadSelectedModel(): ModelKind {
   const raw = localStorage.getItem(STORAGE_KEYS.selectedModel);
-  if (
-    raw === 'deepseek' ||
-    raw === 'qwen' ||
-    raw === 'all' ||
-    raw === 'gemma26' ||
-    raw === 'gemmae4' ||
-    raw === 'gemma_all'
-  ) {
-    return raw;
-  }
-  return 'gemmae4';
+  return normalizeModelKind(raw);
 }
 
 export function saveSelectedModel(value: ModelKind) {
