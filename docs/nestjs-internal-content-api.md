@@ -83,6 +83,64 @@
 }
 ```
 
+## 4) 본문 -> 맞춤법 교정
+
+`POST /internal/v1/content/proofread-from-text`
+
+```json
+{
+  "text": "교정할 본문",
+  "language": "auto",
+  "preserveLanguage": true
+}
+```
+
+응답:
+
+```json
+{
+  "correctedText": "교정된 본문",
+  "model": "deepseek",
+  "requestId": "req-127",
+  "latencyMs": 305
+}
+```
+
+## 5) 본문/노트 -> TODO 생성
+
+`POST /internal/v1/content/todos-from-text`
+
+```json
+{
+  "text": "회의록 또는 작업 본문",
+  "language": "ko",
+  "sourceType": "CHAT",
+  "maxItems": 5,
+  "memberList": ["김철수", "이영희"],
+  "contextMessages": [
+    { "authorName": "김철수", "text": "배포 준비 부탁드립니다" }
+  ]
+}
+```
+
+응답:
+
+```json
+{
+  "items": [
+    {
+      "title": "배포 전 스모크 테스트",
+      "description": "배포 전에 스모크 테스트를 진행하세요.",
+      "assigneeNames": ["이영희"],
+      "priority": "MEDIUM"
+    }
+  ],
+  "model": "deepseek",
+  "requestId": "req-126",
+  "latencyMs": 512
+}
+```
+
 ## 에러 코드
 
 - `400`: 입력값 오류
@@ -98,4 +156,3 @@
 - `localhost`, 사설 IP, link-local 대상 차단
 - MIME 허용 목록: `image/jpeg,image/png,image/webp,image/gif`
 - 최대 다운로드 용량: `MAX_IMAGE_BYTES` (기본 8MB)
-

@@ -66,6 +66,14 @@ export class LlmGatewayClient {
     return this.post('/internal/v1/content/body-from-image', input);
   }
 
+  async proofreadFromText(input: {
+    text: string;
+    language?: 'auto' | Language;
+    preserveLanguage?: boolean;
+  }) {
+    return this.post('/internal/v1/content/proofread-from-text', input);
+  }
+
   private async post(path: string, payload: unknown) {
     const requestId = crypto.randomUUID();
     const response = await fetch(`${this.baseUrl}${path}`, {
@@ -114,4 +122,3 @@ async function safeJson(response: Response) {
     return null;
   }
 }
-

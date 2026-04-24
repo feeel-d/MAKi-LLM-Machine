@@ -7,6 +7,8 @@ ROUTER_PID_FILE="$RUNTIME_DIR/router.pid"
 GATEWAY_PID_FILE="$RUNTIME_DIR/gateway.pid"
 ROUTER_PORT="${ROUTER_PORT:-8081}"
 GATEWAY_PORT="${GATEWAY_PORT:-3001}"
+EMBED_PORT="${EMBED_PORT:-8083}"
+EMBED_PID_FILE="$RUNTIME_DIR/embed.pid"
 
 is_pid_running() {
   local pid="$1"
@@ -83,6 +85,8 @@ stop_descendants_of_matches() {
 }
 
 stop_by_pid_file "gateway" "$GATEWAY_PID_FILE"
+stop_by_pid_file "embed-server" "$EMBED_PID_FILE"
+stop_by_port "embed-server" "$EMBED_PORT"
 stop_by_pid_file "router" "$ROUTER_PID_FILE"
 
 stop_by_port "gateway" "$GATEWAY_PORT"

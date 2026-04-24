@@ -178,10 +178,22 @@ else
   done
 fi
 
+# --- Embedding server (nomic @ 8083, 채팅 라우터와 분리) ---
+EMBED_PORT="${EMBED_PORT:-8083}"
+if [[ -z "$(pid_on_port "$EMBED_PORT")" ]]; then
+  echo "Starting llama embedding server on :${EMBED_PORT} …"
+  nohup "$ROOT_DIR/scripts/run-llama-embed-server.sh" >>"$RUNTIME_DIR/llama-embed-boot.log" 2>&1 &
+  wait_for_http "http://127.0.0.1:${EMBED_PORT}/v1/models" "embed-server" 30 || {
+    echo "⚠️  embedding server HTTP 대기 실패 — 로그: $RUNTIME_DIR/llama-embed.log" >&2
+  }
+else
+  echo "Embedding port ${EMBED_PORT} already in use — skip start"
+fi
+
 # --- Gateway (기존 3001 프로세스가 있으면 교체) ---
 stop_gateway
 start_background "gateway" "$GATEWAY_PID_FILE" "$GATEWAY_LOG_FILE" "$GATEWAY_PORT" \
-  env LLAMA_SERVER_URL="http://127.0.0.1:${ROUTER_PORT}" "$ROOT_DIR/scripts/run-gateway.sh"
+  env LLAMA_SERVER_URL="http://127.0.0.1:${ROUTER_PORT}" LLAMA_EMBEDDINGS_URL="http://127.0.0.1:${EMBED_PORT}" "$ROOT_DIR/scripts/run-gateway.sh"
 wait_for_http "http://127.0.0.1:${GATEWAY_PORT}/api/health" "gateway" 60
 
 # --- Funnel ---

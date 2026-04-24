@@ -116,6 +116,7 @@ npm run test:local        # 다른 터미널 — health / models / chat 스트�
 - `POST /internal/v1/content/title-from-text`
 - `POST /internal/v1/content/title-from-image`
 - `POST /internal/v1/content/body-from-image`
+- `POST /internal/v1/content/proofread-from-text`
 
 자세한 요청/응답 예시는 [nestjs-internal-content-api.md](/Users/markhub/Desktop/workspace/MAKi-LLM-Machine/docs/nestjs-internal-content-api.md), NestJS 호출 샘플은 [nestjs-llm-gateway-client.ts](/Users/markhub/Desktop/workspace/MAKi-LLM-Machine/docs/examples/nestjs-llm-gateway-client.ts) 를 참고하세요.
 

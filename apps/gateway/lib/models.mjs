@@ -22,6 +22,24 @@ export function isRouterSlotReady(entry) {
   return s.value === 'loaded';
 }
 
+/** 슬롯이 라우터에 등록되어 있고(언로드 포함), 실패·로딩 중이 아님 — 지연 로드 허용 */
+export function isRouterSlotRegistered(entry) {
+  if (!entry || typeof entry.id !== 'string' || entry.id === 'default') {
+    return false;
+  }
+  const s = entry.status;
+  if (!s) {
+    return true;
+  }
+  if (s.failed === true) {
+    return false;
+  }
+  if (s.value === 'loading') {
+    return false;
+  }
+  return true;
+}
+
 export function normalizeModel(value) {
   if (
     value === 'deepseek' ||

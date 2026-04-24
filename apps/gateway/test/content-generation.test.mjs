@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createContentGenerationService,
   validateTitleFromTextInput,
+  CONTENT_TASK_MODELS,
 } from '../lib/content-generation.mjs';
 import { InternalApiError } from '../lib/internal-errors.mjs';
 
@@ -10,10 +11,10 @@ const BASE_CONFIG = {
   contentRetryCount: 1,
 };
 
-test('titleFromText uses deepseek and returns normalized title', async () => {
+test('titleFromText uses configured model and returns normalized title', async () => {
   const calls = [];
   const service = createContentGenerationService({
-    fetchRouterModels: async () => [{ id: 'deepseek' }],
+    fetchRouterModels: async () => [{ id: CONTENT_TASK_MODELS.titleFromText }],
     completeJsonCompletion: async (payload) => {
       calls.push(payload);
       return { parsed: { title: '  새 제목   테스트  ' } };
@@ -28,16 +29,16 @@ test('titleFromText uses deepseek and returns normalized title', async () => {
     },
   });
 
-  assert.equal(result.model, 'deepseek');
+  assert.equal(result.model, CONTENT_TASK_MODELS.titleFromText);
   assert.equal(result.title, '새 제목 테스트');
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].model, 'deepseek');
+  assert.equal(calls[0].model, CONTENT_TASK_MODELS.titleFromText);
 });
 
-test('titleFromImage uses gemmae4 and forwards fetched dataUrl', async () => {
+test('titleFromImage uses configured model and forwards fetched dataUrl', async () => {
   const calls = [];
   const service = createContentGenerationService({
-    fetchRouterModels: async () => [{ id: 'gemmae4' }],
+    fetchRouterModels: async () => [{ id: CONTENT_TASK_MODELS.titleFromImage }],
     fetchImageAsDataUrl: async () => ({
       dataUrl: 'data:image/png;base64,AAAA',
       mimeType: 'image/png',
@@ -57,9 +58,9 @@ test('titleFromImage uses gemmae4 and forwards fetched dataUrl', async () => {
     },
   });
 
-  assert.equal(result.model, 'gemmae4');
+  assert.equal(result.model, CONTENT_TASK_MODELS.titleFromImage);
   assert.equal(result.title, '이미지 제목');
-  assert.equal(calls[0].model, 'gemmae4');
+  assert.equal(calls[0].model, CONTENT_TASK_MODELS.titleFromImage);
   const content = calls[0].messages[0].content;
   assert.equal(Array.isArray(content), true);
   assert.equal(content[1].image_url.url, 'data:image/png;base64,AAAA');
@@ -68,7 +69,7 @@ test('titleFromImage uses gemmae4 and forwards fetched dataUrl', async () => {
 test('bodyFromImage defaults to medium length', async () => {
   const calls = [];
   const service = createContentGenerationService({
-    fetchRouterModels: async () => [{ id: 'gemmae4' }],
+    fetchRouterModels: async () => [{ id: CONTENT_TASK_MODELS.bodyFromImage }],
     fetchImageAsDataUrl: async () => ({
       dataUrl: 'data:image/jpeg;base64,AAAA',
       mimeType: 'image/jpeg',
@@ -90,6 +91,33 @@ test('bodyFromImage defaults to medium length', async () => {
 
   assert.equal(result.body, '자동 생성 본문');
   assert.equal(calls[0].maxTokens, 760);
+});
+
+test('proofreadFromText uses deepseek and returns normalized corrected text', async () => {
+  const calls = [];
+  const service = createContentGenerationService({
+    fetchRouterModels: async () => [{ id: 'deepseek' }],
+    completeJsonCompletion: async (payload) => {
+      calls.push(payload);
+      return { parsed: { correctedText: '교정된 문장' } };
+    },
+  });
+
+  const result = await service.proofreadFromText({
+    config: BASE_CONFIG,
+    requestId: 'req-3a',
+    input: {
+      text: '  교정할 문장  ',
+      language: 'auto',
+      preserveLanguage: true,
+    },
+  });
+
+  assert.equal(result.model, 'deepseek');
+  assert.equal(result.correctedText, '교정된 문장');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].model, 'deepseek');
+  assert.match(calls[0].messages[0].content, /Proofread the following text/i);
 });
 
 test('validateTitleFromTextInput rejects invalid style', () => {
@@ -122,3 +150,22 @@ test('titleFromText returns 503 when required model is missing', async () => {
   );
 });
 
+test('proofreadFromText returns 503 when required model is missing', async () => {
+  const service = createContentGenerationService({
+    fetchRouterModels: async () => [{ id: 'qwen' }],
+    completeJsonCompletion: async () => ({ parsed: { correctedText: 'unused' } }),
+  });
+
+  await assert.rejects(
+    () =>
+      service.proofreadFromText({
+        config: BASE_CONFIG,
+        requestId: 'req-5',
+        input: { text: '문장' },
+      }),
+    (error) =>
+      error instanceof InternalApiError &&
+      error.statusCode === 503 &&
+      error.code === 'MODEL_UNAVAILABLE',
+  );
+});

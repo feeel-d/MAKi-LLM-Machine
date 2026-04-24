@@ -7,6 +7,9 @@ const ROUTE_HANDLERS = {
   '/internal/v1/content/title-from-text': 'titleFromText',
   '/internal/v1/content/title-from-image': 'titleFromImage',
   '/internal/v1/content/body-from-image': 'bodyFromImage',
+  '/internal/v1/content/proofread-from-text': 'proofreadFromText',
+  '/internal/v1/content/todos-from-text': 'todosFromText',
+  '/internal/v1/content/embed-from-text': 'embedFromText',
 };
 
 export function createInternalContentRouter({ config, queue }) {

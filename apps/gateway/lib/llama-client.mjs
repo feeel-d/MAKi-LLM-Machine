@@ -1,7 +1,8 @@
 import { createSseParser, extractDeltaText } from './sse.mjs';
-import { isRouterSlotReady } from './models.mjs';
+import { isRouterSlotReady, isRouterSlotRegistered } from './models.mjs';
 
-export async function fetchRouterModels(config) {
+export async function fetchRouterModels(config, options = {}) {
+  const { registeredOnly = false } = options;
   try {
     const response = await fetch(new URL('/v1/models', config.llamaServerUrl), {
       headers: buildHeaders(config),
@@ -13,7 +14,8 @@ export async function fetchRouterModels(config) {
 
     const payload = await response.json();
     const raw = Array.isArray(payload?.data) ? payload.data : [];
-    return raw.filter(isRouterSlotReady);
+    const filter = registeredOnly ? isRouterSlotRegistered : isRouterSlotReady;
+    return raw.filter(filter);
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Model lookup failed')) {
       throw error;
@@ -125,6 +127,8 @@ export async function completeJsonCompletion({
   systemPrompt,
   requestId,
   retryCount = 1,
+  /** llama.cpp 라우터의 일부 모델(Gemma 등)은 OpenAI식 json_object 응답 모드에서 본문이 비는 경우가 있어 끌 수 있음 */
+  jsonResponseFormat = true,
 }) {
   const maxAttempts = Math.max(1, Number(retryCount) + 1);
   let lastError;
@@ -138,6 +142,7 @@ export async function completeJsonCompletion({
         systemPrompt,
         temperature,
         maxTokens,
+        jsonResponseFormat,
       });
       return {
         requestId: requestId ?? crypto.randomUUID(),
@@ -219,27 +224,32 @@ async function requestChatText({
   temperature,
   maxTokens,
   systemPrompt,
+  jsonResponseFormat = true,
 }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort('timeout'), config.requestTimeoutMs);
 
   try {
+    const body = {
+      model,
+      messages: injectSystemPrompt(messages, systemPrompt),
+      stream: false,
+      temperature: typeof temperature === 'number' ? temperature : 0.4,
+      max_tokens: typeof maxTokens === 'number' ? maxTokens : 512,
+    };
+    if (jsonResponseFormat) {
+      body.response_format = {
+        type: 'json_object',
+      };
+    }
+
     const response = await fetch(new URL('/v1/chat/completions', config.llamaServerUrl), {
       method: 'POST',
       headers: {
         ...buildHeaders(config),
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model,
-        messages: injectSystemPrompt(messages, systemPrompt),
-        stream: false,
-        temperature: typeof temperature === 'number' ? temperature : 0.4,
-        max_tokens: typeof maxTokens === 'number' ? maxTokens : 512,
-        response_format: {
-          type: 'json_object',
-        },
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
 
@@ -327,18 +337,18 @@ function extractResponseText(payload) {
     return '';
   }
 
-  if (typeof choice.text === 'string') {
+  if (typeof choice.text === 'string' && choice.text.trim().length > 0) {
     return choice.text;
   }
 
   const message = choice.message ?? choice.delta ?? {};
   const content = message.content;
-  if (typeof content === 'string') {
-    return content;
-  }
+  let out = '';
 
-  if (Array.isArray(content)) {
-    return content
+  if (typeof content === 'string') {
+    out = content;
+  } else if (Array.isArray(content)) {
+    out = content
       .map((item) => {
         if (typeof item === 'string') {
           return item;
@@ -351,7 +361,53 @@ function extractResponseText(payload) {
       .join('');
   }
 
-  return '';
+  if (!String(out).trim() && typeof message.reasoning_content === 'string') {
+    out = message.reasoning_content;
+  }
+
+  return out;
+}
+
+export async function fetchTextEmbedding({ config, model, input, signal }) {
+  const embedBase =
+    config.llamaEmbeddingsUrl && String(config.llamaEmbeddingsUrl).trim().length > 0
+      ? String(config.llamaEmbeddingsUrl).trim().replace(/\/$/, '')
+      : String(config.llamaServerUrl).replace(/\/$/, '');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort('timeout'), config.requestTimeoutMs);
+  const combinedSignal = mergeAbortSignals(signal, controller.signal);
+  try {
+    const response = await fetch(new URL('/v1/embeddings', embedBase), {
+      method: 'POST',
+      headers: {
+        ...buildHeaders(config),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        input,
+      }),
+      signal: combinedSignal,
+    });
+    const text = await response.text();
+    let payload;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      throw new Error(text || "embeddings parse error" + String(response.status));
+    }
+    if (!response.ok) {
+      const msg = payload?.error?.message ?? payload?.message ?? text ?? ("status " + String(response.status));
+      throw new Error(msg);
+    }
+    const emb = payload?.data?.[0]?.embedding;
+    if (!Array.isArray(emb) || emb.length === 0) {
+      throw new Error('Invalid embeddings response shape.');
+    }
+    return emb.map((x) => Number(x));
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function injectSystemPrompt(messages, systemPrompt) {

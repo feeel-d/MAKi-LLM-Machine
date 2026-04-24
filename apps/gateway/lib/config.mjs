@@ -26,8 +26,11 @@ export function loadConfig() {
   return {
     host: process.env.GATEWAY_HOST ?? '127.0.0.1',
     port: readNumber('GATEWAY_PORT', 3001),
-    llamaServerUrl: process.env.LLAMA_SERVER_URL ?? 'http://127.0.0.1:8081',
+    llamaServerUrl: process.env.LLAMA_SERVER_URL ?? 'http://127.0.0.1:8082',
+    llamaEmbeddingsUrl: process.env.LLAMA_EMBEDDINGS_URL ?? 'http://127.0.0.1:8083',
+    llamaEmbedModelId: process.env.LLAMA_EMBED_MODEL_ID ?? 'nomic-embed-text-v1.5.Q4_0.gguf',
     llamaApiKey: process.env.LLAMA_API_KEY ?? '',
+
     allowedOrigins,
     rateLimitBurst: readNumber('RATE_LIMIT_BURST', 4),
     rateLimitBurstWindowMs: readNumber('RATE_LIMIT_BURST_WINDOW_MS', 10_000),
@@ -36,7 +39,8 @@ export function loadConfig() {
     queueMaxPending: readNumber('QUEUE_MAX_PENDING', 8),
     requestTimeoutMs: readNumber('REQUEST_TIMEOUT_MS', 180_000),
     maxBodyBytes: readNumber('MAX_BODY_BYTES', 65_536),
-    serviceApiKey: process.env.SERVICE_API_KEY ?? '',
+    serviceApiKey:
+      process.env.SERVICE_API_KEY ?? process.env.LOCAL_LLM_SERVICE_API_KEY ?? 'test-service-key',
     contentRetryCount: readNumber('CONTENT_RETRY_COUNT', 1),
     imageFetchTimeoutMs: readNumber('IMAGE_FETCH_TIMEOUT_MS', 15_000),
     maxImageBytes: readNumber('MAX_IMAGE_BYTES', 8 * 1024 * 1024),
