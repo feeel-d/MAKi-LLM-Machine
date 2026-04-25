@@ -2,6 +2,7 @@ import { createContentGenerationService } from './content-generation.mjs';
 import { readJsonBody, sendJson } from './http.mjs';
 import { getRequestId, assertServiceKey } from './internal-auth.mjs';
 import { InternalApiError, isInternalApiError } from './internal-errors.mjs';
+import { logStructured } from './structured-log.mjs';
 
 const ROUTE_HANDLERS = {
   '/internal/v1/content/title-from-image': 'titleFromImage',
@@ -44,6 +45,16 @@ export function createInternalContentRouter({ config, queue }) {
       return true;
     } catch (error) {
       const mapped = mapInternalError(error);
+      logStructured('warn', {
+        event: 'internal_content',
+        route: pathname,
+        phase: 'handler_error',
+        requestId,
+        code: mapped.code,
+        statusCode: mapped.statusCode,
+        durationMs: Date.now() - startedAt,
+        message: mapped.message,
+      });
       sendJson(response, mapped.statusCode, {
         error: mapped.message,
         code: mapped.code,

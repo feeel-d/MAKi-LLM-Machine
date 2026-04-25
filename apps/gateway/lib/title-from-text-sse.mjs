@@ -10,16 +10,10 @@ import {
 import { fetchRouterModels, streamChatCompletion } from './llama-client.mjs';
 import { getClientIp, readJsonBody, sendJson } from './http.mjs';
 import { sendEvent, writeSseHeaders } from './sse.mjs';
+import { logStructured } from './structured-log.mjs';
 
-/** @param {'info' | 'warn' | 'error'} level */
-function logTitleFromTextGateway(level, payload) {
-  const row = { ts: new Date().toISOString(), service: 'maki-llm-gateway', route: 'title-from-text', level, ...payload };
-  const line = JSON.stringify(row);
-  if (level === 'error' || level === 'warn') {
-    console.error(line);
-  } else {
-    console.log(line);
-  }
+function logTitle(level, payload) {
+  logStructured(level, { event: 'title_from_text', route: 'title-from-text', ...payload });
 }
 
 /**
@@ -62,7 +56,7 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
 
   const clientIp = getClientIp(request);
   if (!rateLimiter.allow(clientIp, 1)) {
-    logTitleFromTextGateway('warn', { phase: 'rate_limited', requestId: gatewayRequestId, clientIp });
+    logTitle('warn', { phase: 'rate_limited', requestId: gatewayRequestId, clientIp });
     sendJson(response, 429, { error: 'Rate limit exceeded.', requestId: gatewayRequestId });
     return;
   }
@@ -89,7 +83,7 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
   };
 
   emit('meta', { requestId: gatewayRequestId, model });
-  logTitleFromTextGateway('info', { phase: 'stream_start', requestId: gatewayRequestId, model, maxLength: normalized.maxLength });
+  logTitle('info', { phase: 'stream_start', requestId: gatewayRequestId, model, maxLength: normalized.maxLength });
 
   const abortController = new AbortController();
   const closeHandler = () => abortController.abort('client_closed');
@@ -120,7 +114,7 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
         onDone: () => {},
         onError: (payload) => {
           streamErrored = true;
-          logTitleFromTextGateway('error', {
+          logTitle('error', {
             phase: 'llama_stream',
             requestId: gatewayRequestId,
             model,
@@ -132,7 +126,7 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Queue unavailable.';
-    logTitleFromTextGateway('error', { phase: 'queue_or_stream', requestId: gatewayRequestId, model, error: message });
+    logTitle('error', { phase: 'queue_or_stream', requestId: gatewayRequestId, model, err: message });
     emit('error', { requestId: gatewayRequestId, error: message, code: 'QUEUE_ERROR' });
     streamErrored = true;
   } finally {
@@ -143,7 +137,7 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
     try {
       const title = validateTitleOutput(accumulated, normalized.maxLength);
       const latencyMs = Date.now() - startedAt;
-      logTitleFromTextGateway('info', {
+      logTitle('info', {
         phase: 'done',
         requestId: gatewayRequestId,
         model,
@@ -175,7 +169,7 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
         if (error.details && typeof error.details === 'object') {
           payload.details = error.details;
         }
-        logTitleFromTextGateway('error', {
+        logTitle('error', {
           phase: 'validate_output',
           requestId: gatewayRequestId,
           model,
@@ -187,7 +181,7 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
         emit('error', payload);
       } else {
         const err = String(error);
-        logTitleFromTextGateway('error', { phase: 'validate_unexpected', requestId: gatewayRequestId, model, error: err });
+        logTitle('error', { phase: 'validate_unexpected', requestId: gatewayRequestId, model, err });
         emit('error', { requestId: gatewayRequestId, error: err, code: 'VALIDATE_THROW' });
       }
     }

@@ -1,5 +1,6 @@
 import { createSseParser, extractDeltaText } from './sse.mjs';
 import { isRouterSlotReady, isRouterSlotRegistered } from './models.mjs';
+import { logStructured, maskLlamaBaseUrl } from './structured-log.mjs';
 
 export async function fetchRouterModels(config, options = {}) {
   const { registeredOnly = false } = options;
@@ -17,6 +18,12 @@ export async function fetchRouterModels(config, options = {}) {
     const filter = registeredOnly ? isRouterSlotRegistered : isRouterSlotReady;
     return raw.filter(filter);
   } catch (error) {
+    logStructured('error', {
+      event: 'llama_upstream',
+      phase: 'fetch_models',
+      upstream: maskLlamaBaseUrl(config.llamaServerUrl),
+      err: error instanceof Error ? error.message : String(error),
+    });
     if (error instanceof Error && error.message.startsWith('Model lookup failed')) {
       throw error;
     }
@@ -108,6 +115,14 @@ export async function streamChatCompletion({
 
     onDone({ model, requestId });
   } catch (error) {
+    logStructured('error', {
+      event: 'llama_upstream',
+      phase: 'chat_completions_stream',
+      model,
+      llamaRequestId: requestId,
+      upstream: maskLlamaBaseUrl(config.llamaServerUrl),
+      err: error instanceof Error ? error.message : String(error),
+    });
     onError({
       model,
       requestId,
@@ -276,6 +291,13 @@ async function requestChatText({
 
     return outputText;
   } catch (error) {
+    logStructured('error', {
+      event: 'llama_upstream',
+      phase: 'chat_completions',
+      model,
+      upstream: maskLlamaBaseUrl(config.llamaServerUrl),
+      err: error instanceof Error ? error.message : String(error),
+    });
     throw new Error(formatUpstreamFetchError(error, config.llamaServerUrl));
   } finally {
     clearTimeout(timeout);
@@ -405,6 +427,15 @@ export async function fetchTextEmbedding({ config, model, input, signal }) {
       throw new Error('Invalid embeddings response shape.');
     }
     return emb.map((x) => Number(x));
+  } catch (error) {
+    logStructured('error', {
+      event: 'llama_upstream',
+      phase: 'embeddings',
+      model,
+      upstream: maskLlamaBaseUrl(embedBase),
+      err: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
   } finally {
     clearTimeout(timeout);
   }

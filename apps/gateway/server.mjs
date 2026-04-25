@@ -5,11 +5,15 @@ import { CapacityQueue } from './lib/capacity-queue.mjs';
 import { loadConfig } from './lib/config.mjs';
 import { readJsonBody, getClientIp, sendJson, setCorsHeaders } from './lib/http.mjs';
 import { createInternalContentRouter } from './lib/internal-content-routes.mjs';
+import { getRequestId } from './lib/internal-auth.mjs';
 import { handleTitleFromTextSse } from './lib/title-from-text-sse.mjs';
 import { fetchRouterModels, streamChatCompletion } from './lib/llama-client.mjs';
 import { ROUTER_MODEL_IDS, normalizeModel, resolveTargetModels } from './lib/models.mjs';
 import { RateLimiter } from './lib/rate-limiter.mjs';
+import { logStructured } from './lib/structured-log.mjs';
 import { sendEvent, writeSseHeaders } from './lib/sse.mjs';
+
+process.title = 'maki-llm-gateway';
 
 const config = loadConfig();
 const rateLimiter = new RateLimiter({
@@ -27,8 +31,22 @@ const webDistPath = path.join(repoRoot, 'apps', 'web', 'dist');
 const handleInternalContentRoute = createInternalContentRouter({ config, queue });
 
 const server = http.createServer(async (request, response) => {
+  const requestId = getRequestId(request);
+  const reqStart = Date.now();
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
   const isInternalRoute = url.pathname.startsWith('/internal/');
+
+  response.setHeader('X-Request-Id', requestId);
+  response.on('finish', () => {
+    logStructured('info', {
+      event: 'http_request',
+      requestId,
+      method: request.method,
+      path: url.pathname,
+      statusCode: response.statusCode,
+      durationMs: Date.now() - reqStart,
+    });
+  });
 
   if (!isInternalRoute) {
     setCorsHeaders(request, response, config.allowedOrigins);
@@ -74,6 +92,15 @@ const server = http.createServer(async (request, response) => {
 
     sendJson(response, 404, { error: 'Not found' });
   } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    logStructured('error', {
+      event: 'unhandled_error',
+      requestId,
+      path: url.pathname,
+      method: request.method,
+      message: err.message,
+      stackPreview: err.stack ? err.stack.split('\n').slice(0, 6).join(' | ') : undefined,
+    });
     console.error(error);
 
     if (!response.headersSent) {
@@ -89,7 +116,7 @@ const server = http.createServer(async (request, response) => {
 });
 
 server.listen(config.port, config.host, () => {
-  console.log(`Gateway listening on http://${config.host}:${config.port}`);
+  logStructured('info', { event: 'server_listen', host: config.host, port: config.port, pid: process.pid });
 });
 
 async function handleHealth(response) {
@@ -216,6 +243,13 @@ async function handleChatStream(request, response) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Queue unavailable.';
+    logStructured('warn', {
+      event: 'chat_stream',
+      phase: 'queue_error',
+      requestId,
+      model,
+      err: message,
+    });
     emit('error', { requestId, model, error: message });
   } finally {
     request.off('close', closeHandler);

@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# --- 로그(SSH 점검) — 저장소 루트 기준 ---
+# tail -f .runtime/gateway.log
+# JSON만: grep maki-llm-gateway .runtime/gateway.log | tail -20
+# HTTP 액세스: grep '"event":"http_request"' .runtime/gateway.log
+# 제목 API: grep '"event":"title_from_text"' .runtime/gateway.log
+# 라우터 LLM 오류: grep '"event":"llama_upstream"' .runtime/gateway.log
+# requestId로 추적: grep '<uuid>' .runtime/gateway.log
+# jq: grep maki-llm-gateway .runtime/gateway.log | jq -c 'select(.event=="llama_upstream")'
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_DIR="${RUNTIME_DIR:-$ROOT_DIR/.runtime}"
 ROUTER_PID_FILE="$RUNTIME_DIR/router.pid"

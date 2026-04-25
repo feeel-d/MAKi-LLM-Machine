@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# 단독 실행 시 로그는 터미널; start-all.sh 가 .runtime/gateway.log 로 리다이렉트. 상세: docs/ops-logs.md
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
