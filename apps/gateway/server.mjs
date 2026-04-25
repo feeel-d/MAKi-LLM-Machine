@@ -5,6 +5,7 @@ import { CapacityQueue } from './lib/capacity-queue.mjs';
 import { loadConfig } from './lib/config.mjs';
 import { readJsonBody, getClientIp, sendJson, setCorsHeaders } from './lib/http.mjs';
 import { createInternalContentRouter } from './lib/internal-content-routes.mjs';
+import { handleTitleFromTextSse } from './lib/title-from-text-sse.mjs';
 import { fetchRouterModels, streamChatCompletion } from './lib/llama-client.mjs';
 import { ROUTER_MODEL_IDS, normalizeModel, resolveTargetModels } from './lib/models.mjs';
 import { RateLimiter } from './lib/rate-limiter.mjs';
@@ -40,6 +41,11 @@ const server = http.createServer(async (request, response) => {
   }
 
   try {
+    if (request.method === 'POST' && url.pathname === '/internal/v1/content/title-from-text/stream') {
+      await handleTitleFromTextSse({ request, response, config, queue, rateLimiter });
+      return;
+    }
+
     if (await handleInternalContentRoute(request, response, url.pathname)) {
       return;
     }

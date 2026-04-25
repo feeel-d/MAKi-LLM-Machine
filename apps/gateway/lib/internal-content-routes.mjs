@@ -4,7 +4,6 @@ import { getRequestId, assertServiceKey } from './internal-auth.mjs';
 import { InternalApiError, isInternalApiError } from './internal-errors.mjs';
 
 const ROUTE_HANDLERS = {
-  '/internal/v1/content/title-from-text': 'titleFromText',
   '/internal/v1/content/title-from-image': 'titleFromImage',
   '/internal/v1/content/body-from-image': 'bodyFromImage',
   '/internal/v1/content/proofread-from-text': 'proofreadFromText',

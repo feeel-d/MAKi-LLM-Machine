@@ -1,6 +1,7 @@
 import { completeJsonCompletion, fetchRouterModels, fetchTextEmbedding } from './llama-client.mjs';
 import { fetchImageAsDataUrl } from './image-ingest.mjs';
 import { InternalApiError } from './internal-errors.mjs';
+import { resolveLogicalRouterModelId } from './models.mjs';
 
 /** llama-server 라우터 슬롯 id — title·proofread·todos·이미지 태스크 모두 E4B 슬롯 사용 */
 const ROUTER_SLOT_GEMMA_E4B = 'gemmae4';
@@ -26,12 +27,12 @@ export function createContentGenerationService(dependencies = {}) {
   return {
     async titleFromText({ config, requestId, input }) {
       const normalized = validateTitleFromTextInput(input);
-      await ensureModelAvailable(config, CONTENT_TASK_MODELS.titleFromText, fetchModels);
+      const model = await ensureModelAvailable(config, CONTENT_TASK_MODELS.titleFromText, fetchModels);
 
       const prompt = buildTitleFromTextPrompt(normalized);
       const completion = await runJsonCompletion({
         config,
-        model: CONTENT_TASK_MODELS.titleFromText,
+        model,
         requestId,
         retryCount: config.contentRetryCount,
         temperature: 0.3,
@@ -48,13 +49,13 @@ export function createContentGenerationService(dependencies = {}) {
       const title = validateTitleOutput(completion.parsed?.title ?? completion.text, normalized.maxLength);
       return {
         title,
-        model: CONTENT_TASK_MODELS.titleFromText,
+        model,
       };
     },
 
     async titleFromImage({ config, requestId, input }) {
       const normalized = validateTitleFromImageInput(input);
-      await ensureModelAvailable(config, CONTENT_TASK_MODELS.titleFromImage, fetchModels);
+      const model = await ensureModelAvailable(config, CONTENT_TASK_MODELS.titleFromImage, fetchModels);
 
       const image = await fetchImage({
         imageUrl: normalized.imageUrl,
@@ -63,7 +64,7 @@ export function createContentGenerationService(dependencies = {}) {
 
       const completion = await runJsonCompletion({
         config,
-        model: CONTENT_TASK_MODELS.titleFromImage,
+        model,
         requestId,
         retryCount: config.contentRetryCount,
         temperature: 0.4,
@@ -91,13 +92,13 @@ export function createContentGenerationService(dependencies = {}) {
       const title = validateTitleOutput(completion.parsed?.title ?? completion.text, normalized.maxLength);
       return {
         title,
-        model: CONTENT_TASK_MODELS.titleFromImage,
+        model,
       };
     },
 
     async bodyFromImage({ config, requestId, input }) {
       const normalized = validateBodyFromImageInput(input);
-      await ensureModelAvailable(config, CONTENT_TASK_MODELS.bodyFromImage, fetchModels);
+      const model = await ensureModelAvailable(config, CONTENT_TASK_MODELS.bodyFromImage, fetchModels);
 
       const image = await fetchImage({
         imageUrl: normalized.imageUrl,
@@ -106,7 +107,7 @@ export function createContentGenerationService(dependencies = {}) {
 
       const completion = await runJsonCompletion({
         config,
-        model: CONTENT_TASK_MODELS.bodyFromImage,
+        model,
         requestId,
         retryCount: config.contentRetryCount,
         temperature: 0.7,
@@ -134,17 +135,17 @@ export function createContentGenerationService(dependencies = {}) {
       const body = validateBodyOutput(completion.parsed?.body ?? completion.text);
       return {
         body,
-        model: CONTENT_TASK_MODELS.bodyFromImage,
+        model,
       };
     },
 
     async proofreadFromText({ config, requestId, input }) {
       const normalized = validateProofreadFromTextInput(input);
-      await ensureModelAvailable(config, CONTENT_TASK_MODELS.proofreadFromText, fetchModels);
+      const model = await ensureModelAvailable(config, CONTENT_TASK_MODELS.proofreadFromText, fetchModels);
 
       const completion = await runJsonCompletion({
         config,
-        model: CONTENT_TASK_MODELS.proofreadFromText,
+        model,
         requestId,
         retryCount: config.contentRetryCount,
         temperature: 0.15,
@@ -160,17 +161,17 @@ export function createContentGenerationService(dependencies = {}) {
       const correctedText = validateProofreadOutput(completion.parsed?.correctedText ?? completion.text);
       return {
         correctedText,
-        model: CONTENT_TASK_MODELS.proofreadFromText,
+        model,
       };
     },
 
     async todosFromText({ config, requestId, input }) {
       const normalized = validateTodosFromTextInput(input);
-      await ensureModelAvailable(config, CONTENT_TASK_MODELS.todosFromText, fetchModels);
+      const model = await ensureModelAvailable(config, CONTENT_TASK_MODELS.todosFromText, fetchModels);
 
       const completion = await runJsonCompletion({
         config,
-        model: CONTENT_TASK_MODELS.todosFromText,
+        model,
         requestId,
         retryCount: config.contentRetryCount,
         temperature: 0.25,
@@ -186,7 +187,7 @@ export function createContentGenerationService(dependencies = {}) {
       const items = validateTodoItemsOutput(completion.parsed?.items ?? completion.text, normalized.maxItems);
       return {
         items,
-        model: CONTENT_TASK_MODELS.todosFromText,
+        model,
       };
     },
 
@@ -474,10 +475,11 @@ ${input.text}${memberSection}${contextSection}`;
 
 export async function ensureModelAvailable(config, modelId, fetchModels = fetchRouterModels) {
   const models = await fetchModels(config, { registeredOnly: true });
-  const available = models.some((entry) => entry.id === modelId);
-  if (!available) {
+  const resolved = resolveLogicalRouterModelId(models, modelId);
+  if (!resolved) {
     throw new InternalApiError(503, `Model ${modelId} is unavailable.`, 'MODEL_UNAVAILABLE');
   }
+  return resolved;
 }
 
 export function validateTitleOutput(raw, maxLength) {

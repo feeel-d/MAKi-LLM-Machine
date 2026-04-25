@@ -9,9 +9,13 @@
 - 요청 ID: `X-Request-Id` (선택, 없으면 Gateway 생성)
 - 응답 공통: `requestId`, `latencyMs`
 
-## 1) 본문 -> 제목
+## 1) 본문 -> 제목 (SSE / 청크)
 
-`POST /internal/v1/content/title-from-text`
+`POST /internal/v1/content/title-from-text/stream`  
+`Content-Type: application/json` — 요청 본문은 이전과 동일.  
+**응답:** `Content-Type: text/event-stream` (Server-Sent Events)
+
+요청:
 
 ```json
 {
@@ -22,16 +26,14 @@
 }
 ```
 
-응답:
+이벤트(순서):
 
-```json
-{
-  "title": "생성된 제목",
-  "model": "gemmae4",
-  "requestId": "req-123",
-  "latencyMs": 214
-}
-```
+- `event: meta` / `data: {"requestId":"…","model":"gemmae4"}`  
+- `event: chunk` / `data: {"text":"…"}` (모델이 내보내는 토큰 델타, 여러 번)  
+- `event: done` / `data: {"title":"최종 제목","model":"…","requestId":"…","latencyMs":123,"finished":true}`  
+- 오류 시: `event: error` / `data: { "error": "…", "code": "…" }` (또는 upstream 형식)
+
+**curl 예시:** `curl -N -X POST …/title-from-text/stream -H "Content-Type: application/json" -H "X-Service-Key: …" -d '{…}'`
 
 ## 2) 이미지 -> 제목
 

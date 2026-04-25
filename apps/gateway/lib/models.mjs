@@ -40,6 +40,33 @@ export function isRouterSlotRegistered(entry) {
   return true;
 }
 
+/**
+ * 컨텐츠 태스크 등에서 쓰는 논리 id(`gemmae4`)를 라우터 `/v1/models`의 실제 id로 맞춘다.
+ * HF 전체 id만 있는 환경에서는 `gemma-4-E4B` 패턴의 **로드된** 슬롯을 택한다.
+ */
+export function resolveLogicalRouterModelId(models, logicalId) {
+  if (typeof logicalId !== 'string') {
+    return null;
+  }
+  const ready = models.filter(isRouterSlotReady);
+  if (ready.some((e) => e.id === logicalId)) {
+    return logicalId;
+  }
+  const aliasMatch = ready.find(
+    (e) => Array.isArray(e.aliases) && e.aliases.includes(logicalId),
+  );
+  if (aliasMatch) {
+    return aliasMatch.id;
+  }
+  if (logicalId === 'gemmae4') {
+    const e4b = ready.find((e) => typeof e.id === 'string' && /gemma-4-E4B/i.test(e.id));
+    if (e4b) {
+      return e4b.id;
+    }
+  }
+  return null;
+}
+
 export function normalizeModel(value) {
   if (value === 'gemma26' || value === 'gemmae4' || value === 'gemma_all') {
     return value;

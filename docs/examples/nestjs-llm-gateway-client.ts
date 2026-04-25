@@ -42,8 +42,13 @@ export class LlmGatewayClient {
     language?: Language;
     style?: TitleStyle;
     maxLength?: number;
-  }) {
-    return this.post('/internal/v1/content/title-from-text', input);
+  }): Promise<{
+    title: string;
+    model?: string;
+    requestId?: string;
+    latencyMs?: number;
+  }> {
+    return this.readTitleFromTextSseResponse(input);
   }
 
   async createTitleFromImage(input: {
@@ -74,6 +79,44 @@ export class LlmGatewayClient {
     return this.post('/internal/v1/content/proofread-from-text', input);
   }
 
+  private async readTitleFromTextSseResponse(payload: unknown) {
+    const requestId = crypto.randomUUID();
+    const response = await fetch(`${this.baseUrl}/internal/v1/content/title-from-text/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Service-Key': this.serviceKey,
+        'X-Request-Id': requestId,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const body = await safeJson(response);
+      throw new LlmGatewayError(
+        response.status,
+        mapGatewayErrorCode(response.status),
+        body?.error ?? 'Gateway request failed.',
+        body?.requestId ?? requestId,
+      );
+    }
+
+    const ct = response.headers.get('content-type') ?? '';
+    if (!ct.includes('text/event-stream')) {
+      const body = (await response.json()) as { title?: string; model?: string; requestId?: string; latencyMs?: number };
+      if (typeof body?.title === 'string') {
+        return body;
+      }
+      throw new LlmGatewayError(502, 'INTERNAL_ERROR', 'Invalid gateway response (expected SSE or JSON with title).');
+    }
+
+    const title = await parseTitleFromTextSse(response);
+    if (!title) {
+      throw new LlmGatewayError(502, 'INTERNAL_ERROR', 'Stream ended without title.');
+    }
+    return title;
+  }
+
   private async post(path: string, payload: unknown) {
     const requestId = crypto.randomUUID();
     const response = await fetch(`${this.baseUrl}${path}`, {
@@ -98,6 +141,72 @@ export class LlmGatewayClient {
 
     return body;
   }
+}
+
+type TitleFromTextDone = {
+  title: string;
+  model?: string;
+  requestId?: string;
+  latencyMs?: number;
+};
+
+async function parseTitleFromTextSse(response: Response): Promise<TitleFromTextDone | null> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    return null;
+  }
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let lastDone: TitleFromTextDone | null = null;
+  let errMsg: string | undefined;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+    for (;;) {
+      const sep = buffer.indexOf('\n\n');
+      if (sep === -1) {
+        break;
+      }
+      const segment = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      let eventName = '';
+      const dataLines: string[] = [];
+      for (const line of segment.split('\n')) {
+        if (line.startsWith('event:')) {
+          eventName = line.slice(6).trim();
+        } else if (line.startsWith('data:')) {
+          dataLines.push(line.slice(5).trimStart());
+        }
+      }
+      const dataStr = dataLines.join('\n');
+      if (!dataStr) {
+        continue;
+      }
+      try {
+        const data = JSON.parse(dataStr) as Record<string, unknown>;
+        if (eventName === 'done' && typeof data.title === 'string') {
+          lastDone = {
+            title: data.title,
+            model: typeof data.model === 'string' ? data.model : undefined,
+            requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
+            latencyMs: typeof data.latencyMs === 'number' && Number.isFinite(data.latencyMs) ? data.latencyMs : undefined,
+          };
+        }
+        if (eventName === 'error' && data.error) {
+          errMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data);
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+  if (errMsg) {
+    throw new LlmGatewayError(400, 'UNPROCESSABLE', errMsg);
+  }
+  return lastDone;
 }
 
 function mapGatewayErrorCode(statusCode: number): GatewayErrorCode {
