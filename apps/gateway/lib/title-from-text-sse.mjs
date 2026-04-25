@@ -11,6 +11,17 @@ import { fetchRouterModels, streamChatCompletion } from './llama-client.mjs';
 import { getClientIp, readJsonBody, sendJson } from './http.mjs';
 import { sendEvent, writeSseHeaders } from './sse.mjs';
 
+/** @param {'info' | 'warn' | 'error'} level */
+function logTitleFromTextGateway(level, payload) {
+  const row = { ts: new Date().toISOString(), service: 'maki-llm-gateway', route: 'title-from-text', level, ...payload };
+  const line = JSON.stringify(row);
+  if (level === 'error' || level === 'warn') {
+    console.error(line);
+  } else {
+    console.log(line);
+  }
+}
+
 /**
  * POST /internal/v1/content/title-from-text/stream
  * Server-Sent Events (chunk 단위: event `chunk` { text } → 마지막 `done` { title, model, requestId, latencyMs, finished: true }).
@@ -51,6 +62,7 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
 
   const clientIp = getClientIp(request);
   if (!rateLimiter.allow(clientIp, 1)) {
+    logTitleFromTextGateway('warn', { phase: 'rate_limited', requestId: gatewayRequestId, clientIp });
     sendJson(response, 429, { error: 'Rate limit exceeded.', requestId: gatewayRequestId });
     return;
   }
@@ -77,6 +89,7 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
   };
 
   emit('meta', { requestId: gatewayRequestId, model });
+  logTitleFromTextGateway('info', { phase: 'stream_start', requestId: gatewayRequestId, model, maxLength: normalized.maxLength });
 
   const abortController = new AbortController();
   const closeHandler = () => abortController.abort('client_closed');
@@ -107,13 +120,20 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
         onDone: () => {},
         onError: (payload) => {
           streamErrored = true;
+          logTitleFromTextGateway('error', {
+            phase: 'llama_stream',
+            requestId: gatewayRequestId,
+            model,
+            upstream: payload,
+          });
           emit('error', { ...payload, requestId: gatewayRequestId });
         },
       });
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Queue unavailable.';
-    emit('error', { requestId: gatewayRequestId, error: message });
+    logTitleFromTextGateway('error', { phase: 'queue_or_stream', requestId: gatewayRequestId, model, error: message });
+    emit('error', { requestId: gatewayRequestId, error: message, code: 'QUEUE_ERROR' });
     streamErrored = true;
   } finally {
     request.off('close', closeHandler);
@@ -122,22 +142,53 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
   if (!streamErrored) {
     try {
       const title = validateTitleOutput(accumulated, normalized.maxLength);
+      const latencyMs = Date.now() - startedAt;
+      logTitleFromTextGateway('info', {
+        phase: 'done',
+        requestId: gatewayRequestId,
+        model,
+        latencyMs,
+        titleChars: title.length,
+        acc: {
+          bytes: accumulated.length,
+          lineCount: accumulated ? accumulated.split('\n').length : 0,
+        },
+      });
       emit('done', {
         title,
         model,
         requestId: gatewayRequestId,
-        latencyMs: Date.now() - startedAt,
+        latencyMs,
         finished: true,
       });
     } catch (error) {
       if (isInternalApiError(error)) {
-        emit('error', {
+        const acc = {
+          bytes: accumulated.length,
+          lineCount: accumulated ? accumulated.split('\n').length : 0,
+        };
+        const payload = {
           requestId: gatewayRequestId,
           error: error.message,
           code: error.code,
+        };
+        if (error.details && typeof error.details === 'object') {
+          payload.details = error.details;
+        }
+        logTitleFromTextGateway('error', {
+          phase: 'validate_output',
+          requestId: gatewayRequestId,
+          model,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          acc,
         });
+        emit('error', payload);
       } else {
-        emit('error', { requestId: gatewayRequestId, error: String(error) });
+        const err = String(error);
+        logTitleFromTextGateway('error', { phase: 'validate_unexpected', requestId: gatewayRequestId, model, error: err });
+        emit('error', { requestId: gatewayRequestId, error: err, code: 'VALIDATE_THROW' });
       }
     }
   }

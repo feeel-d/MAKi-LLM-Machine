@@ -483,6 +483,14 @@ export async function ensureModelAvailable(config, modelId, fetchModels = fetchR
 }
 
 export function validateTitleOutput(raw, maxLength) {
+  const rawTrim = asString(raw).replace(/\r\n/g, '\n').trim();
+  if (!rawTrim) {
+    throw new InternalApiError(422, 'Model did not produce a valid title.', 'INVALID_TITLE_OUTPUT', {
+      reason: 'RAW_EMPTY',
+      stats: { bytes: 0, lineCount: 0, hasJsonBrace: false, hasJsonTitleKey: false },
+    });
+  }
+
   const sanitizeTitle = (value) => {
     let s = asString(value).replace(/\r\n/g, '\n').trim();
     if (!s) return '';
@@ -558,7 +566,16 @@ export function validateTitleOutput(raw, maxLength) {
 
   const title = sanitizeTitle(raw);
   if (!title) {
-    throw new InternalApiError(422, 'Model did not produce a valid title.', 'INVALID_TITLE_OUTPUT');
+    const stats = {
+      bytes: rawTrim.length,
+      lineCount: rawTrim.split('\n').length,
+      hasJsonBrace: rawTrim.includes('{'),
+      hasJsonTitleKey: /"title"\s*:/.test(rawTrim),
+    };
+    throw new InternalApiError(422, 'Model did not produce a valid title.', 'INVALID_TITLE_OUTPUT', {
+      reason: 'SANITIZE_EMPTY',
+      stats,
+    });
   }
   if (title.length > maxLength) {
     return title.slice(0, maxLength).trim();
