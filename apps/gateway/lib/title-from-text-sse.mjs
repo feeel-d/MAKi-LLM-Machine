@@ -1,3 +1,4 @@
+import os from 'node:os';
 import { assertServiceKey, getRequestId } from './internal-auth.mjs';
 import { InternalApiError, isInternalApiError } from './internal-errors.mjs';
 import {
@@ -12,8 +13,36 @@ import { getClientIp, readJsonBody, sendJson } from './http.mjs';
 import { sendEvent, writeSseHeaders } from './sse.mjs';
 import { logStructured } from './structured-log.mjs';
 
+const TITLE_TEMPERATURE = 0.3;
+const TITLE_MAX_TOKENS = 512;
+
 function logTitle(level, payload) {
   logStructured(level, { event: 'title_from_text', route: 'title-from-text', ...payload });
+}
+
+function modelDebugFields(model) {
+  const m = String(model ?? '');
+  const q = /:([A-Z0-9_]+)\s*$/i.exec(m);
+  return {
+    modelId: m,
+    quantLabel: q ? q[1] : undefined,
+    modelFamily: /gemma/i.test(m) ? 'gemma' : /llama|mistral|qwen/i.test(m) ? 'other' : undefined,
+  };
+}
+
+function hostResourceSnapshot() {
+  try {
+    const la = os.loadavg();
+    return {
+      loadavg1m: la[0],
+      loadavg5m: la[1],
+      loadavg15m: la[2],
+      freeMemMb: Math.round(os.freemem() / 1024 / 1024),
+      totalMemMb: Math.round(os.totalmem() / 1024 / 1024),
+    };
+  } catch {
+    return {};
+  }
 }
 
 /**
@@ -83,7 +112,22 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
   };
 
   emit('meta', { requestId: gatewayRequestId, model });
-  logTitle('info', { phase: 'stream_start', requestId: gatewayRequestId, model, maxLength: normalized.maxLength });
+  logTitle('info', {
+    phase: 'stream_start',
+    requestId: gatewayRequestId,
+    model,
+    maxLength: normalized.maxLength,
+    ...modelDebugFields(model),
+    sourceTextChars: normalized.text.length,
+    promptChars: prompt.length,
+    language: normalized.language,
+    style: normalized.style,
+    inference: { temperature: TITLE_TEMPERATURE, maxTokens: TITLE_MAX_TOKENS },
+    queue: queue.getStats(),
+    host: hostResourceSnapshot(),
+    debugHint:
+      'queue=inference·slot(GPU). RAW_EMPTY+inUse/pending↑·load↑면 동시성·Q4·temperature/top_p. VRAM/CUDA는 llama/호스트 nvidia-smi',
+  });
 
   const abortController = new AbortController();
   const closeHandler = () => abortController.abort('client_closed');
@@ -101,8 +145,8 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
         model,
         messages: [{ role: 'user', content: prompt }],
         systemPrompt: undefined,
-        temperature: 0.3,
-        maxTokens: 512,
+        temperature: TITLE_TEMPERATURE,
+        maxTokens: TITLE_MAX_TOKENS,
         signal,
         onMeta: () => {},
         onToken: ({ text }) => {
@@ -118,6 +162,10 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
             phase: 'llama_stream',
             requestId: gatewayRequestId,
             model,
+            ...modelDebugFields(model),
+            inference: { temperature: TITLE_TEMPERATURE, maxTokens: TITLE_MAX_TOKENS },
+            queue: queue.getStats(),
+            host: hostResourceSnapshot(),
             upstream: payload,
           });
           emit('error', { ...payload, requestId: gatewayRequestId });
@@ -126,7 +174,15 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Queue unavailable.';
-    logTitle('error', { phase: 'queue_or_stream', requestId: gatewayRequestId, model, err: message });
+    logTitle('error', {
+      phase: 'queue_or_stream',
+      requestId: gatewayRequestId,
+      model,
+      ...modelDebugFields(model),
+      err: message,
+      queue: queue.getStats(),
+      host: hostResourceSnapshot(),
+    });
     emit('error', { requestId: gatewayRequestId, error: message, code: 'QUEUE_ERROR' });
     streamErrored = true;
   } finally {
@@ -141,12 +197,16 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
         phase: 'done',
         requestId: gatewayRequestId,
         model,
+        ...modelDebugFields(model),
         latencyMs,
         titleChars: title.length,
         acc: {
           bytes: accumulated.length,
           lineCount: accumulated ? accumulated.split('\n').length : 0,
         },
+        inference: { temperature: TITLE_TEMPERATURE, maxTokens: TITLE_MAX_TOKENS },
+        queue: queue.getStats(),
+        host: hostResourceSnapshot(),
       });
       emit('done', {
         title,
@@ -173,10 +233,20 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
           phase: 'validate_output',
           requestId: gatewayRequestId,
           model,
+          ...modelDebugFields(model),
           code: error.code,
           message: error.message,
           details: error.details,
           acc,
+          sourceTextChars: normalized.text.length,
+          promptChars: prompt.length,
+          inference: { temperature: TITLE_TEMPERATURE, maxTokens: TITLE_MAX_TOKENS },
+          queue: queue.getStats(),
+          host: hostResourceSnapshot(),
+          debugHint:
+            error.code === 'INVALID_TITLE_OUTPUT' && (error.details && error.details.reason) === 'RAW_EMPTY'
+              ? '누적 0바이트: llama·샘플링·슬롯·동시 title 요청과 queue/host 로그를 함께 본다'
+              : undefined,
         });
         emit('error', payload);
       } else {

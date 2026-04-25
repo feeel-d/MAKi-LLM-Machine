@@ -41,4 +41,15 @@ export class CapacityQueue {
         });
     }
   }
+
+  /** title-from-text 디버그: GPU 슬롯(동시 inference)·대기 큐 압박 상관 */
+  getStats() {
+    return {
+      capacity: this.capacity,
+      maxPending: this.maxPending,
+      inUse: this.inUse,
+      pendingJobs: this.pending.length,
+      pendingUnits: this.pending.reduce((sum, item) => sum + item.units, 0),
+    };
+  }
 }
