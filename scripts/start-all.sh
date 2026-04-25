@@ -177,7 +177,19 @@ start_background "gateway" "$GATEWAY_PID_FILE" "$GATEWAY_LOG_FILE" "$GATEWAY_POR
   env LLAMA_SERVER_URL="http://127.0.0.1:${ROUTER_PORT}" LLAMA_EMBEDDINGS_URL="http://127.0.0.1:${EMBED_PORT}" "$ROOT_DIR/scripts/run-gateway.sh"
 wait_for_http "http://127.0.0.1:${GATEWAY_PORT}/api/health" "gateway" 60
 
-# --- Funnel ---
-"$ROOT_DIR/scripts/start-funnel.sh"
-echo "Funnel status:"
-tailscale funnel status
+# --- Funnel (tailscale 미기동·오프라인이면 실패해도 라우터·게이트웨이는 이미 기동됨) ---
+if [[ "${MAKI_SKIP_FUNNEL:-0}" == "1" ]]; then
+  echo "⏭️  MAKI_SKIP_FUNNEL=1 — skipping tailscale funnel"
+else
+  set +e
+  "$ROOT_DIR/scripts/start-funnel.sh"
+  _funnel_rc=$?
+  set -e
+  if [[ "$_funnel_rc" -eq 0 ]]; then
+    echo "Funnel status:"
+    tailscale funnel status 2>&1 || true
+  else
+    echo "⚠️  start-funnel failed (rc=${_funnel_rc}). MAKI_SKIP_FUNNEL=1 로 다시 실행하거나 tailscale 로그인을 확인하세요." >&2
+    command -v tailscale >/dev/null 2>&1 && tailscale status 2>&1 | head -20 || true
+  fi
+fi
