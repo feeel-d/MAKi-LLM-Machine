@@ -30,6 +30,10 @@ const webBasePath = '/MAKi-LLM-Machine';
 const webDistPath = path.join(repoRoot, 'apps', 'web', 'dist');
 const handleInternalContentRoute = createInternalContentRouter({ config, queue });
 
+/** /api/health 는 폴링이 잦아 로그가 과다해지므로, http_request 는 60초에 최대 1건만 남긴다. */
+let lastHealthAccessLogAt = 0;
+const HEALTH_ACCESS_LOG_INTERVAL_MS = 60_000;
+
 const server = http.createServer(async (request, response) => {
   const requestId = getRequestId(request);
   const reqStart = Date.now();
@@ -38,6 +42,14 @@ const server = http.createServer(async (request, response) => {
 
   response.setHeader('X-Request-Id', requestId);
   response.on('finish', () => {
+    const isHealth = request.method === 'GET' && url.pathname === '/api/health';
+    if (isHealth) {
+      const now = Date.now();
+      if (now - lastHealthAccessLogAt < HEALTH_ACCESS_LOG_INTERVAL_MS) {
+        return;
+      }
+      lastHealthAccessLogAt = now;
+    }
     logStructured('info', {
       event: 'http_request',
       requestId,
