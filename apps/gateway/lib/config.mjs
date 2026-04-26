@@ -38,7 +38,8 @@ export function loadConfig() {
     queueCapacity: readNumber('QUEUE_CAPACITY', 2),
     queueMaxPending: readNumber('QUEUE_MAX_PENDING', 8),
     requestTimeoutMs: readNumber('REQUEST_TIMEOUT_MS', 180_000),
-    maxBodyBytes: readNumber('MAX_BODY_BYTES', 65_536),
+    /** title-from-text 등 대용량 JSON(본문 ~100k) — 환경에서 조정 가능 */
+    maxBodyBytes: readNumber('MAX_BODY_BYTES', 262_144),
     serviceApiKey:
       process.env.SERVICE_API_KEY ?? process.env.LOCAL_LLM_SERVICE_API_KEY ?? 'test-service-key',
     contentRetryCount: readNumber('CONTENT_RETRY_COUNT', 1),

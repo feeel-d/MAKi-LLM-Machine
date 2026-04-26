@@ -2,7 +2,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-type Language = 'ko' | 'en';
+type Language = 'auto' | 'ko' | 'en';
 type TitleStyle = 'neutral' | 'marketing' | 'news';
 type BodyLength = 'short' | 'medium' | 'long';
 
@@ -41,7 +41,10 @@ export class LlmGatewayClient {
     text: string;
     language?: Language;
     style?: TitleStyle;
+    /** 8~200, 기본 게이트웨이 100 */
     maxLength?: number;
+    inputMode?: 'full' | 'digest';
+    bodyDigestMaxChars?: number;
   }): Promise<{
     title: string;
     model?: string;

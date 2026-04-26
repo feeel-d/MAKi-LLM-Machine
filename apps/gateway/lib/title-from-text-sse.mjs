@@ -2,7 +2,8 @@ import os from 'node:os';
 import { assertServiceKey, getRequestId } from './internal-auth.mjs';
 import { InternalApiError, isInternalApiError } from './internal-errors.mjs';
 import {
-  buildTitleFromTextPrompt,
+  buildTitleFromTextSystemPrompt,
+  buildTitleFromTextUserContent,
   CONTENT_TASK_MODELS,
   ensureModelAvailable,
   validateTitleFromTextInput,
@@ -14,7 +15,8 @@ import { sendEvent, writeSseHeaders } from './sse.mjs';
 import { logStructured } from './structured-log.mjs';
 
 const TITLE_TEMPERATURE = 0.3;
-const TITLE_MAX_TOKENS = 512;
+/** 제목 한 줄 JSON — 200자 이하 출력에 맞춘 상한(지연·비용 안정) */
+const TITLE_MAX_TOKENS = 384;
 
 function logTitle(level, payload) {
   logStructured(level, { event: 'title_from_text', route: 'title-from-text', ...payload });
@@ -101,7 +103,8 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
     throw error;
   }
 
-  const prompt = buildTitleFromTextPrompt(normalized);
+  const systemPrompt = buildTitleFromTextSystemPrompt(normalized);
+  const userContent = buildTitleFromTextUserContent(normalized);
 
   writeSseHeaders(response);
 
@@ -118,13 +121,17 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
     model,
     maxLength: normalized.maxLength,
     ...modelDebugFields(model),
+    originalSourceChars: normalized.originalSourceChars,
+    digestChars: normalized.digestChars,
     sourceTextChars: normalized.text.length,
-    promptChars: prompt.length,
+    promptChars: systemPrompt.length + userContent.length,
+    inputMode: normalized.inputMode,
     language: normalized.language,
     style: normalized.style,
     inference: { temperature: TITLE_TEMPERATURE, maxTokens: TITLE_MAX_TOKENS },
     queue: queue.getStats(),
     host: hostResourceSnapshot(),
+    tracking: { feature: 'title_from_text', outcome: 'stream_start' },
     debugHint:
       'queue=inference·slot(GPU). RAW_EMPTY+inUse/pending↑·load↑면 동시성·Q4·temperature/top_p. VRAM/CUDA는 llama/호스트 nvidia-smi',
   });
@@ -143,8 +150,8 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
       await streamChatCompletion({
         config,
         model,
-        messages: [{ role: 'user', content: prompt }],
-        systemPrompt: undefined,
+        messages: [{ role: 'user', content: userContent }],
+        systemPrompt,
         temperature: TITLE_TEMPERATURE,
         maxTokens: TITLE_MAX_TOKENS,
         signal,
@@ -158,16 +165,17 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
         onDone: () => {},
         onError: (payload) => {
           streamErrored = true;
-          logTitle('error', {
-            phase: 'llama_stream',
-            requestId: gatewayRequestId,
-            model,
-            ...modelDebugFields(model),
-            inference: { temperature: TITLE_TEMPERATURE, maxTokens: TITLE_MAX_TOKENS },
-            queue: queue.getStats(),
-            host: hostResourceSnapshot(),
-            upstream: payload,
-          });
+        logTitle('error', {
+          phase: 'llama_stream',
+          requestId: gatewayRequestId,
+          model,
+          ...modelDebugFields(model),
+          inference: { temperature: TITLE_TEMPERATURE, maxTokens: TITLE_MAX_TOKENS },
+          queue: queue.getStats(),
+          host: hostResourceSnapshot(),
+          tracking: { feature: 'title_from_text', outcome: 'upstream_error', code: payload?.code },
+          upstream: payload,
+        });
           emit('error', { ...payload, requestId: gatewayRequestId });
         },
       });
@@ -182,6 +190,7 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
       err: message,
       queue: queue.getStats(),
       host: hostResourceSnapshot(),
+      tracking: { feature: 'title_from_text', outcome: 'queue_or_stream_error', code: 'QUEUE_ERROR' },
     });
     emit('error', { requestId: gatewayRequestId, error: message, code: 'QUEUE_ERROR' });
     streamErrored = true;
@@ -200,6 +209,9 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
         ...modelDebugFields(model),
         latencyMs,
         titleChars: title.length,
+        originalSourceChars: normalized.originalSourceChars,
+        digestChars: normalized.digestChars,
+        tracking: { feature: 'title_from_text', outcome: 'success' },
         acc: {
           bytes: accumulated.length,
           lineCount: accumulated ? accumulated.split('\n').length : 0,
@@ -238,11 +250,14 @@ export async function handleTitleFromTextSse({ request, response, config, queue,
           message: error.message,
           details: error.details,
           acc,
+          originalSourceChars: normalized.originalSourceChars,
+          digestChars: normalized.digestChars,
           sourceTextChars: normalized.text.length,
-          promptChars: prompt.length,
+          promptChars: systemPrompt.length + userContent.length,
           inference: { temperature: TITLE_TEMPERATURE, maxTokens: TITLE_MAX_TOKENS },
           queue: queue.getStats(),
           host: hostResourceSnapshot(),
+          tracking: { feature: 'title_from_text', outcome: 'validate_error', errorCode: error.code },
           debugHint:
             error.code === 'INVALID_TITLE_OUTPUT' && (error.details && error.details.reason) === 'RAW_EMPTY'
               ? '누적 0바이트: llama·샘플링·슬롯·동시 title 요청과 queue/host 로그를 함께 본다'

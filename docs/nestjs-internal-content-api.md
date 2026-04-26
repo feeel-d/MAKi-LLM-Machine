@@ -20,11 +20,22 @@
 ```json
 {
   "text": "본문 텍스트",
-  "language": "ko",
+  "language": "auto",
   "style": "neutral",
-  "maxLength": 48
+  "maxLength": 100,
+  "inputMode": "digest",
+  "bodyDigestMaxChars": 8000
 }
 ```
+
+| 필드 | 필수 | 설명 |
+|------|------|------|
+| `text` | 예 | 원문(최대 ~100k자). 프롬프트에는 `inputMode`에 따라 압축됨. |
+| `language` | 아니오 | `auto` (기본) \| `ko` \| `en` — `auto`는 소스와 동일 언어로 제목. |
+| `style` | 아니오 | `neutral` (기본) \| `marketing` \| `news` |
+| `maxLength` | 아니오 | **8~200** 정수, 기본 **100**. 최종 `done.title`은 이 길이 이하. |
+| `inputMode` | 아니오 | `digest` (기본): W 초과 시 앞·뒤 윈도우. `full`: 앞에서 `bodyDigestMaxChars`자만. |
+| `bodyDigestMaxChars` | 아니오 | **256~8000**, 기본 8000 — LLM에 넣는 본문 예산 W. |
 
 이벤트(순서):
 
@@ -145,12 +156,16 @@
 
 ## 에러 코드
 
-- `400`: 입력값 오류
-- `401`: `X-Service-Key` 불일치
-- `413`: 본문/이미지 크기 초과
-- `422`: 이미지 URL/MIME/형식 오류, 모델 출력 포맷 오류
-- `503`: 모델 비가용, 큐 포화, 내부 키 미설정
-- `504`: 이미지 fetch 또는 LLM 타임아웃
+| HTTP | `code` (JSON, 자주 쓰는 것) | 설명 |
+|------|-----------------------------|------|
+| `400` | `TEXT_REQUIRED`, `INVALID_MAX_LENGTH` (8~200), `INVALID_LANGUAGE`, `INVALID_STYLE`, `INVALID_INPUT_MODE`, `INVALID_BODY_DIGEST_MAX_CHARS` | 입력값 오류 |
+| `401` | — | `X-Service-Key` 불일치 |
+| `413` | `TEXT_TOO_LARGE` | `text`가 상한(100k) 초과 |
+| `422` | `INVALID_TITLE_OUTPUT` (세부 `reason`: `RAW_EMPTY`, `SANITIZE_EMPTY` 등) | 모델 출력이 유효한 제목이 아님 |
+| `429` | — | Rate limit |
+| `503` | `MODEL_UNAVAILABLE` 등 | 모델 비가용, 내부 키 미설정 |
+- 이미지 API: `413`/`422` (MIME 등) — 위와 별도로 이미지 다운로드·형식 검증 실패 시에도 `422` 가능
+- `504`: 이미지 fetch 또는 LLM 타임아웃(해당 경로)
 
 ## 이미지 URL 정책
 

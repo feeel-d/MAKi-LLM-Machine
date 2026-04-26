@@ -6,6 +6,14 @@ import { resolveLogicalRouterModelId } from './models.mjs';
 /** llama-server 라우터 슬롯 id — title·proofread·todos·이미지 태스크 모두 E4B 슬롯 사용 */
 const ROUTER_SLOT_GEMMA_E4B = 'gemmae4';
 
+/** 제목 LLM에 넣는 본문 상한(문자) — MAKi `buildLocalTitleContext` / digest 정책과 맞출 것 */
+export const TITLE_CONTEXT_MAX_CHARS = 8000;
+/** 제목 출력 maxLength 상한 — MAKi GraphQL / LocalLLM과 동일 */
+export const TITLE_MAX_OUTPUT_LENGTH = 200;
+const TITLE_INPUT_MAX_CHARS = 100_000;
+const TITLE_INPUT_MODES = new Set(['full', 'digest']);
+const TITLE_LANGUAGES = new Set(['auto', 'ko', 'en']);
+
 const TITLE_STYLES = new Set(['neutral', 'marketing', 'news']);
 const LANGUAGES = new Set(['ko', 'en']);
 const BODY_LENGTHS = new Set(['short', 'medium', 'long']);
@@ -29,19 +37,21 @@ export function createContentGenerationService(dependencies = {}) {
       const normalized = validateTitleFromTextInput(input);
       const model = await ensureModelAvailable(config, CONTENT_TASK_MODELS.titleFromText, fetchModels);
 
-      const prompt = buildTitleFromTextPrompt(normalized);
+      const systemPrompt = buildTitleFromTextSystemPrompt(normalized);
+      const userContent = buildTitleFromTextUserContent(normalized);
       const completion = await runJsonCompletion({
         config,
         model,
         requestId,
         retryCount: config.contentRetryCount,
         temperature: 0.3,
-        maxTokens: 512,
+        maxTokens: 384,
         jsonResponseFormat: false,
+        systemPrompt,
         messages: [
           {
             role: 'user',
-            content: prompt,
+            content: userContent,
           },
         ],
       });
@@ -258,20 +268,90 @@ function fitEmbeddingToDimensions(values, targetDim) {
   return padded;
 }
 
+/**
+ * 긴 본문을 고정 예산으로 압축(앞·뒤). must match MAKi `buildLocalTitleContext` algorithm.
+ * @param {string} text
+ * @param {number} [maxChars]
+ */
+export function digestTitleSourceText(text, maxChars = TITLE_CONTEXT_MAX_CHARS) {
+  const t = asString(text);
+  const cap = Math.min(Math.max(256, Number(maxChars) || TITLE_CONTEXT_MAX_CHARS), TITLE_CONTEXT_MAX_CHARS);
+  if (t.length <= cap) {
+    return t;
+  }
+  const sep = '\n\n[...]\n\n';
+  const budget = cap - sep.length;
+  const headLen = Math.floor(budget * 0.5);
+  const tailLen = budget - headLen;
+  return `${t.slice(0, headLen).trimEnd()}${sep}${t.slice(-tailLen).trimStart()}`;
+}
+
+function normalizeInputMode(value) {
+  if (value === undefined || value === null || value === '') {
+    return 'digest';
+  }
+  const mode = asString(value).toLowerCase();
+  if (!TITLE_INPUT_MODES.has(mode)) {
+    throw new InternalApiError(400, 'inputMode must be "full" or "digest".', 'INVALID_INPUT_MODE');
+  }
+  return mode;
+}
+
+function normalizeBodyDigestMaxChars(value) {
+  if (value === undefined || value === null || value === '') {
+    return TITLE_CONTEXT_MAX_CHARS;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 256 || parsed > TITLE_CONTEXT_MAX_CHARS) {
+    throw new InternalApiError(
+      400,
+      `bodyDigestMaxChars must be an integer between 256 and ${TITLE_CONTEXT_MAX_CHARS}.`,
+      'INVALID_BODY_DIGEST_MAX_CHARS',
+    );
+  }
+  return parsed;
+}
+
+function normalizeTitleLanguage(value) {
+  if (value === undefined || value === null || value === '') {
+    return 'auto';
+  }
+  const language = asString(value).toLowerCase();
+  if (!TITLE_LANGUAGES.has(language)) {
+    throw new InternalApiError(400, 'language must be one of "auto", "ko", "en".', 'INVALID_LANGUAGE');
+  }
+  return language;
+}
+
 export function validateTitleFromTextInput(input) {
   const text = asString(input?.text);
   if (!text) {
     throw new InternalApiError(400, 'text is required.', 'TEXT_REQUIRED');
   }
-  if (text.length > 12_000) {
+  if (text.length > TITLE_INPUT_MAX_CHARS) {
     throw new InternalApiError(413, 'text is too large.', 'TEXT_TOO_LARGE');
   }
 
-  const language = normalizeLanguage(input?.language);
+  const language = normalizeTitleLanguage(input?.language);
   const style = normalizeStyle(input?.style);
   const maxLength = normalizeMaxLength(input?.maxLength);
+  const inputMode = normalizeInputMode(input?.inputMode);
+  const bodyDigestMaxChars = normalizeBodyDigestMaxChars(input?.bodyDigestMaxChars);
 
-  return { text, language, style, maxLength };
+  const originalSourceChars = text.length;
+  const promptText =
+    inputMode === 'full' ? text.slice(0, bodyDigestMaxChars) : digestTitleSourceText(text, bodyDigestMaxChars);
+
+  return {
+    text,
+    promptText,
+    originalSourceChars,
+    digestChars: promptText.length,
+    language,
+    style,
+    maxLength,
+    inputMode,
+  };
 }
 
 export function validateTitleFromImageInput(input) {
@@ -285,7 +365,7 @@ export function validateTitleFromImageInput(input) {
     throw new InternalApiError(413, 'contextText is too large.', 'CONTEXT_TOO_LARGE');
   }
 
-  const language = normalizeLanguage(input?.language);
+  const language = normalizeTitleLanguage(input?.language);
   const style = normalizeStyle(input?.style);
   const maxLength = normalizeMaxLength(input?.maxLength);
 
@@ -385,22 +465,57 @@ export function validateTodosFromTextInput(input) {
   };
 }
 
-export function buildTitleFromTextPrompt(input) {
-  const languageLabel = input.language === 'en' ? 'English' : 'Korean';
-  return `Create one ${languageLabel} title (${input.style}, max ${input.maxLength} chars). Return JSON object only: {"title":"..."}.
-Rules:
-- Output a single short title line only inside the title field.
-- Do not include reasoning, analysis, markdown, code fences, lists, or prefixes.
-- Keep the title in the same language as the input.
+function resolveTitlePromptText(input) {
+  if (input.promptText != null && String(input.promptText).length > 0) {
+    return asString(input.promptText);
+  }
+  return asString(input.text);
+}
 
-Source text:
-${input.text}`;
+/**
+ * System role: 규칙·언어·출력 형식 (user에는 본문만).
+ */
+export function buildTitleFromTextSystemPrompt(input) {
+  const langRule =
+    input.language === 'auto'
+      ? 'Keep the title in the same language as the source text (do not translate to another language).'
+      : input.language === 'en'
+        ? 'The title must be written in English.'
+        : 'The title must be written in Korean.';
+  return `You are a title generator. Produce exactly one short headline for the source text.
+Style: ${input.style}. Maximum length: ${input.maxLength} characters (stay within this limit).
+Return a JSON object only, with the exact shape: {"title":"..."}.
+Rules:
+- Put a single short title string in the title field only.
+- No reasoning, chain-of-thought, markdown, code fences, bullet lists, or "Title:" prefixes.
+- ${langRule}`;
+}
+
+/**
+ * User role: 소스 텍스트만 (이미 digest/limit 적용된 promptText).
+ */
+export function buildTitleFromTextUserContent(input) {
+  return `Source text:\n${resolveTitlePromptText(input)}`;
+}
+
+/** @deprecated 벤치·단일 user 메시지 호환용 — production은 system+user 분리 */
+export function buildTitleFromTextPrompt(input) {
+  return `${buildTitleFromTextSystemPrompt(input)}\n\n${buildTitleFromTextUserContent(input)}`;
 }
 
 export function buildTitleFromImagePrompt(input) {
-  const languageLabel = input.language === 'en' ? 'English' : 'Korean';
+  const languageLabel =
+    input.language === 'auto'
+      ? 'the same language as the image context or visible text'
+      : input.language === 'en'
+        ? 'English'
+        : 'Korean';
   const context = input.contextText ? ` Context: ${input.contextText}` : '';
-  return `Create one ${languageLabel} title for this image (${input.style}, max ${input.maxLength} chars). Return JSON: {"title":"..."}${context}`;
+  const langInstruction =
+    input.language === 'auto'
+      ? 'Keep the title in the same language as the image context or on-image text when possible.'
+      : `Write the title in ${languageLabel}.`;
+  return `Create one short title for this image (${input.style}, max ${input.maxLength} chars). ${langInstruction} Return JSON: {"title":"..."}${context}`;
 }
 
 export function buildBodyFromImagePrompt(input) {
@@ -658,12 +773,16 @@ function normalizeStyle(value) {
 
 function normalizeMaxLength(value) {
   if (value === undefined || value === null || value === '') {
-    return 48;
+    return 100;
   }
 
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 8 || parsed > 120) {
-    throw new InternalApiError(400, 'maxLength must be an integer between 8 and 120.', 'INVALID_MAX_LENGTH');
+  if (!Number.isInteger(parsed) || parsed < 8 || parsed > TITLE_MAX_OUTPUT_LENGTH) {
+    throw new InternalApiError(
+      400,
+      `maxLength must be an integer between 8 and ${TITLE_MAX_OUTPUT_LENGTH}.`,
+      'INVALID_MAX_LENGTH',
+    );
   }
   return parsed;
 }
