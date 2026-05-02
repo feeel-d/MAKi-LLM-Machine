@@ -8,7 +8,12 @@ import { createInternalContentRouter } from './lib/internal-content-routes.mjs';
 import { getRequestId } from './lib/internal-auth.mjs';
 import { handleTitleFromTextSse } from './lib/title-from-text-sse.mjs';
 import { fetchRouterModels, streamChatCompletion } from './lib/llama-client.mjs';
-import { ROUTER_MODEL_IDS, normalizeModel, resolveTargetModels } from './lib/models.mjs';
+import {
+  ROUTER_MODEL_IDS,
+  normalizeModel,
+  resolveLogicalRouterModelId,
+  resolveTargetModels,
+} from './lib/models.mjs';
 import { RateLimiter } from './lib/rate-limiter.mjs';
 import { logStructured } from './lib/structured-log.mjs';
 import { sendEvent, writeSseHeaders } from './lib/sse.mjs';
@@ -134,9 +139,9 @@ server.listen(config.port, config.host, () => {
 async function handleHealth(response) {
   try {
     const models = await fetchRouterModels(config);
-    const visibleModels = models
-      .map((entry) => entry.id)
-      .filter((id) => ROUTER_MODEL_IDS.includes(id));
+    const visibleModels = ROUTER_MODEL_IDS.filter(
+      (logical) => resolveLogicalRouterModelId(models, logical) != null,
+    );
     sendJson(response, 200, {
       status: 'ok',
       upstream: 'reachable',
@@ -157,16 +162,17 @@ async function handleHealth(response) {
 async function handleModels(response) {
   try {
     const models = await fetchRouterModels(config);
-    const available = new Set(models.map((entry) => entry.id));
+    const e26 = resolveLogicalRouterModelId(models, 'gemma26') != null;
+    const e4 = resolveLogicalRouterModelId(models, 'gemmae4') != null;
 
     sendJson(response, 200, {
       data: [
-        { id: 'gemma26', label: 'Gemma 4 26B', available: available.has('gemma26') },
-        { id: 'gemmae4', label: 'Gemma 4 E4B', available: available.has('gemmae4') },
+        { id: 'gemma26', label: 'Gemma 4 26B', available: e26 },
+        { id: 'gemmae4', label: 'Gemma 4 E4B', available: e4 },
         {
           id: 'gemma_all',
           label: 'Gemma All',
-          available: available.has('gemma26') && available.has('gemmae4'),
+          available: e26 && e4,
         },
       ],
     });
@@ -223,14 +229,33 @@ async function handleChatStream(request, response) {
 
   try {
     await queue.enqueue(cost, async () => {
+      const routerModels = await fetchRouterModels(config);
       const targetModels = resolveTargetModels(model);
+      const resolved = targetModels.map((logical) => ({
+        logical,
+        upstream: resolveLogicalRouterModelId(routerModels, logical),
+      }));
+      const missing = resolved.find((r) => !r.upstream);
+      if (missing) {
+        const msg = `model '${missing.logical}' not found`;
+        logStructured('warn', {
+          event: 'chat_stream',
+          phase: 'model_resolve',
+          requestId,
+          logical: missing.logical,
+          routerIds: routerModels.map((m) => m.id),
+        });
+        emit('error', { requestId, model, error: msg });
+        return;
+      }
+
       let completed = 0;
 
       await Promise.all(
-        targetModels.map((targetModel) =>
+        resolved.map(({ logical: targetModel, upstream: upstreamModel }) =>
           streamChatCompletion({
             config,
-            model: targetModel,
+            model: upstreamModel,
             messages:
               model === 'gemma_all' && body.messagesByModel?.[targetModel]
                 ? body.messagesByModel[targetModel]
@@ -239,16 +264,19 @@ async function handleChatStream(request, response) {
             temperature: body.temperature,
             maxTokens: body.maxTokens,
             signal: abortController.signal,
-            onMeta: (payload) => emit('meta', payload),
-            onToken: (payload) => emit('token', payload),
+            onMeta: (payload) =>
+              emit('meta', { ...payload, model: targetModel }),
+            onToken: (payload) =>
+              emit('token', { ...payload, model: targetModel }),
             onDone: (payload) => {
               completed += 1;
-              emit('done', payload);
+              emit('done', { ...payload, model: targetModel });
               if (completed === targetModels.length) {
                 emit('done', { requestId, model, finished: true });
               }
             },
-            onError: (payload) => emit('error', payload),
+            onError: (payload) =>
+              emit('error', { ...payload, model: targetModel }),
           }),
         ),
       );
