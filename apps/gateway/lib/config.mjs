@@ -37,12 +37,16 @@ export function loadConfig() {
     rateLimitMinute: readNumber('RATE_LIMIT_MINUTE', 12),
     queueCapacity: readNumber('QUEUE_CAPACITY', 2),
     queueMaxPending: readNumber('QUEUE_MAX_PENDING', 8),
-    requestTimeoutMs: readNumber('REQUEST_TIMEOUT_MS', 180_000),
+    requestTimeoutMs: readNumber('REQUEST_TIMEOUT_MS', 300_000),
     /** title-from-text 등 대용량 JSON(본문 ~100k) — 환경에서 조정 가능 */
     maxBodyBytes: readNumber('MAX_BODY_BYTES', 262_144),
     serviceApiKey:
       process.env.SERVICE_API_KEY ?? process.env.LOCAL_LLM_SERVICE_API_KEY ?? 'test-service-key',
     contentRetryCount: readNumber('CONTENT_RETRY_COUNT', 1),
+    /** body-from-image: 기본은 약 3줄 요약 — 긴 글은 env로 상향 */
+    contentBodyMaxTokensShort: readNumber('CONTENT_BODY_MAX_TOKENS_SHORT', 320),
+    contentBodyMaxTokensMedium: readNumber('CONTENT_BODY_MAX_TOKENS_MEDIUM', 512),
+    contentBodyMaxTokensLong: readNumber('CONTENT_BODY_MAX_TOKENS_LONG', 768),
     imageFetchTimeoutMs: readNumber('IMAGE_FETCH_TIMEOUT_MS', 15_000),
     maxImageBytes: readNumber('MAX_IMAGE_BYTES', 8 * 1024 * 1024),
     allowedImageMime,

@@ -6,7 +6,7 @@
 #   SKIP_ZSHRC=1        ~/.zshrc 셸 도우미 추가 생략
 #   FORCE_LLAMA_REBUILD=1  llama.cpp 재빌드
 #   LLAMA_CPP_ROOT       기본 ~/llama.cpp
-#   GEMMA26_URL / GEMMAE4_URL  Gemma 4 GGUF (기본 bartowski Q4_K_M)
+#   GEMMA26_URL / GEMMAE4_URL / GEMMAE4_MMPROJ_URL  Gemma 4 GGUF + E4B mmproj
 
 set -euo pipefail
 
@@ -19,6 +19,7 @@ JOBS="${JOBS:-$( (sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4) 
 
 GEMMA26_URL="${GEMMA26_URL:-https://huggingface.co/bartowski/google_gemma-4-26B-A4B-it-GGUF/resolve/main/google_gemma-4-26B-A4B-it-Q4_K_M.gguf}"
 GEMMAE4_URL="${GEMMAE4_URL:-https://huggingface.co/bartowski/google_gemma-4-E4B-it-GGUF/resolve/main/google_gemma-4-E4B-it-Q4_K_M.gguf}"
+GEMMAE4_MMPROJ_URL="${GEMMAE4_MMPROJ_URL:-https://huggingface.co/bartowski/google_gemma-4-E4B-it-GGUF/resolve/main/mmproj-google_gemma-4-E4B-it-f16.gguf}"
 
 echo "[1/5] 의존성 (git, cmake, wget)…"
 if ! command -v brew >/dev/null 2>&1; then
@@ -52,10 +53,12 @@ if [[ "${SKIP_DOWNLOAD:-0}" != "1" ]]; then
   echo "[4/5] Gemma 4 GGUF 다운로드 (이미 있으면 이어받기)…"
   wget -c -O "$MODELS_DIR/gemma4-26b.gguf" "$GEMMA26_URL"
   wget -c -O "$MODELS_DIR/gemma4-e4b.gguf" "$GEMMAE4_URL"
+  wget -c -O "$MODELS_DIR/mmproj-google_gemma-4-E4B-it-f16.gguf" "$GEMMAE4_MMPROJ_URL"
 else
   echo "[4/5] SKIP_DOWNLOAD=1 → 모델 다운로드 생략"
   [[ -f "$MODELS_DIR/gemma4-26b.gguf" ]] || echo "  경고: $MODELS_DIR/gemma4-26b.gguf 없음"
   [[ -f "$MODELS_DIR/gemma4-e4b.gguf" ]] || echo "  경고: $MODELS_DIR/gemma4-e4b.gguf 없음"
+  [[ -f "$MODELS_DIR/mmproj-google_gemma-4-E4B-it-f16.gguf" ]] || echo "  경고: E4B mmproj 없음 — 이미지 API용: $MODELS_DIR/mmproj-google_gemma-4-E4B-it-f16.gguf"
 fi
 
 echo "[5/5] 프로젝트 테스트 스크립트 갱신…"
@@ -131,6 +134,7 @@ echo "✅ SETUP COMPLETE"
 echo ""
 echo "바이너리: $LLAMA_COMPLETION"
 echo "모델:     $MODELS_DIR/gemma4-26b.gguf , $MODELS_DIR/gemma4-e4b.gguf"
+echo "E4B mmproj: $MODELS_DIR/mmproj-google_gemma-4-E4B-it-f16.gguf"
 echo ""
 echo "GGUF 스모크: cd $SCRIPT_DIR && ./run_gemma26_test.sh && ./run_gemmae4_test.sh"
 echo "스택 HTTP:   ./scripts/start-all.sh 후  npm run test:local"

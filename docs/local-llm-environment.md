@@ -74,6 +74,11 @@
 |------|--------------------------|------|
 | `~/models/gemma4-26b.gguf` | `bartowski/google_gemma-4-26B-A4B-it-GGUF` → `google_gemma-4-26B-A4B-it-Q4_K_M.gguf` | Gemma 4 (26B·A4B instruct) |
 | `~/models/gemma4-e4b.gguf` | `bartowski/google_gemma-4-E4B-it-GGUF` → `google_gemma-4-E4B-it-Q4_K_M.gguf` | Gemma 4 (E4B instruct) |
+| `~/models/mmproj-google_gemma-4-E4B-it-f16.gguf` | 동일 레포 → `mmproj-google_gemma-4-E4B-it-f16.gguf` | **E4B 비전(이미지)** 용 mmproj — `body-from-image` / 채팅 `image_url` 에 필수 |
+
+`llama-server` 프리셋([`config/llama-router-models-gemmae4.template.ini`](../config/llama-router-models-gemmae4.template.ini))의 `gemmae4` 슬롯은 메인 GGUF와 함께 **`mmproj`** 줄을 넣어야 합니다. 파일이 없으면 upstream에서 `image input is not supported … provide the mmproj` 가 납니다. `scripts/download-gemma-models.sh` 또는 `setup-local-llm.sh` 가 기본 경로로 mmproj까지 받습니다.
+
+**`ROUTER_UBATCH`:** 이미지 디코딩 시 한 번에 들어가는 비전 토큰 수가 ubatch보다 커지면 llama.cpp가 assert로 종료할 수 있습니다. [`run-llama-router.sh`](../scripts/run-llama-router.sh) 기본값은 **`ROUTER_BATCH`/`ROUTER_UBATCH`=1024** 입니다 (RAM/OOM이면 512 등으로 낮춤).
 
 다른 양자화/모델로 바꿀 때는 같은 경로에 덮어쓰거나, 스크립트의 `MODEL` 환경 변수를 지정합니다.
 
@@ -102,9 +107,13 @@ gemmae4-run -p "한 문장으로 요약해줘: ..."
 | `./run_gemma26_test.sh` | Gemma 4 26B — ctx 16384→8192→4096 재시도 |
 | `./run_gemmae4_test.sh` | Gemma 4 E4B — 단일 ctx 스모크 |
 | `npm run test:local` | **라우터(8081)+게이트웨이(3001) 기동 후** `/api/health`, `/api/models`, `POST /api/chat/stream`(기본 `gemmae4`) 검증 |
-| `npm run test:all` | `npm test`(게이트웨이 단위) + `test:local` |
+| `npm run test:all` | `npm test` + 위 스모크 + **`POST /internal/v1/content/body-from-image`**(E4B+mmproj, `SKIP_BODY_FROM_IMAGE=0`) |
 
-`test:local` 옵션: `SKIP_CHAT=1`(헬스·모델만), `SKIP_ROUTER=1`(게이트웨이만), `CHAT_MODEL=gemmae4` 등.
+`test:local` 옵션: `SKIP_CHAT=1`(헬스·모델만), `SKIP_ROUTER=1`(게이트웨이만), `CHAT_MODEL=gemmae4`, **`SKIP_BODY_FROM_IMAGE=0`** 로 내부 이미지 본문 생성 API까지 검증.
+
+게이트웨이 `.env`: **`REQUEST_TIMEOUT_MS`** 기본 300000ms(CoT·긴 생성). **`CONTENT_BODY_MAX_TOKENS_*`** 로 `body-from-image`의 `max_tokens` 상한 조정. MAKi 서버 **`LOCAL_LLM_IMAGE_TIMEOUT_MS`** 는 게이트웨이 타임아웃 이상 권장.
+
+`body-from-image`는 장문 기사 본문이 아니라, 이미지에서 읽은 텍스트·수치·항목을 **짧게 요약**(약 몇 줄)하는 API입니다.
 
 ---
 
@@ -152,4 +161,4 @@ llama.cpp:      ~/llama.cpp/build/bin/
 2. **Tailscale Funnel:** `tailscale funnel --bg 3001` (`scripts/start-funnel.sh` 동일). `tailscale funnel status` 의 `https://....ts.net` 를 브라우저 Gateway URL에 넣는다 (게이트웨이 포트와 동일해야 함).
 3. **nginx가 443/80 앞단일 때:** 전역 `301` 으로 `app.markhub.ai` 등으로 몰면 GitHub Pages 프론트가 API JSON 대신 HTML/리다이렉트를 받는다. `location ^~ /api/` 는 `proxy_pass http://127.0.0.1:3001;` 로 두거나, Funnel 전용 호스트만 게이트웨이에 붙인다. 레포 참고: `deploy/macos/nginx-maki-ink-api-proxy.conf`.
 4. **라우터 포트:** 기본 `8081` (`ROUTER_PORT`). nginx·다른 서비스가 8080을 쓰는 경우와 충돌하지 않게 맞춘다.
-기본 스택은 `MAKI_ROUTER_PROFILE=e4`(gemmae4만). 26B까지 올릴 때는 `./scripts/stop-all.sh && MAKI_ROUTER_PROFILE=full ./scripts/start-all.sh` 후 `VERIFY_PROFILE=full CHAT_MODEL=gemmae4 npm run test:local` 로 확인.
+기본 스택은 `MAKI_ROUTER_PROFILE=e4`(gemmae4만). `GEMMAE4_CTX` 기본은 CoT·비전 여유를 위해 **8192**(RAM 부족 시 낮춤). 26B까지 올릴 때는 `./scripts/stop-all.sh && MAKI_ROUTER_PROFILE=full ./scripts/start-all.sh` 후 `VERIFY_PROFILE=full CHAT_MODEL=gemmae4 npm run test:local` 로 확인.

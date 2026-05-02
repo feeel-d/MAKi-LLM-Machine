@@ -74,12 +74,12 @@ npm run test:local        # 다른 터미널 — health / models / chat 스트�
 환경 변수로 조정 가능한 값:
 
 - `MAKI_ROUTER_PROFILE`: 기본 `e4`(gemmae4 슬롯만, `MODELS_MAX=1`, `llama-router-models-gemmae4.template.ini`) / `full`이면 26B+E4B(`MODELS_MAX=2`)
-- `GEMMA26_CTX`, `GEMMAE4_CTX`: 기본 `4096` / `2048` (`full`일 때만 26B 경로 사용)
+- `GEMMA26_CTX`, `GEMMAE4_CTX`: 기본 `4096` / `8192` (`full`일 때만 26B 경로 사용; E4B는 CoT·비전 KV 여유)
 - `GEMMA26_MODEL_PATH`, `GEMMAE4_MODEL_PATH`
 - `MODELS_MAX`: 프로필에 맞게 기본 `1`(e4) 또는 `2`(full); 필요 시 덮어씀
 - `ROUTER_PORT`: 기본 `8081` (nginx 등이 8080을 쓰는 경우가 많음)
 - 슬롯 검증: `scripts/router-verify-slots.mjs` — `e4` → `gemmae4`만, `full` → `gemma26`+`gemmae4`
-- `ROUTER_PARALLEL`, `ROUTER_BATCH`, `ROUTER_UBATCH`: 기본 `1`, `512`, `256` (Gemma OOM 완화)
+- `ROUTER_PARALLEL`, `ROUTER_BATCH`, `ROUTER_UBATCH`: 기본 `1`, `1024`, `1024` (비전·CoT 배치 여유; RAM 부족 시 낮춤)
 - `LLAMA_API_KEY`: 내부 llama-server 보호가 필요할 때 사용
 
 ## 4. Gateway 실행

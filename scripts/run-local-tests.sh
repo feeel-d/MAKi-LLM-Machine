@@ -8,5 +8,5 @@ echo "=== npm test (gateway 단위) ==="
 npm test
 
 echo ""
-echo "=== scripts/test-local-stack.sh (Gemma, VERIFY_PROFILE=${VERIFY_PROFILE:-e4}) ==="
-VERIFY_PROFILE="${VERIFY_PROFILE:-e4}" CHAT_MODEL=gemmae4 "$ROOT/scripts/test-local-stack.sh"
+echo "=== scripts/test-local-stack.sh (Gemma, VERIFY_PROFILE=${VERIFY_PROFILE:-e4}, vision smoke on) ==="
+SKIP_BODY_FROM_IMAGE="${SKIP_BODY_FROM_IMAGE:-0}" VERIFY_PROFILE="${VERIFY_PROFILE:-e4}" CHAT_MODEL=gemmae4 "$ROOT/scripts/test-local-stack.sh"

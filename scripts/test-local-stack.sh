@@ -7,6 +7,7 @@ GATEWAY_URL="${GATEWAY_URL:-http://127.0.0.1:3001}"
 ROUTER_URL="${ROUTER_URL:-http://127.0.0.1:8081}"
 SKIP_ROUTER="${SKIP_ROUTER:-0}"
 SKIP_CHAT="${SKIP_CHAT:-0}"
+SKIP_BODY_FROM_IMAGE="${SKIP_BODY_FROM_IMAGE:-1}"
 CHAT_MODEL="${CHAT_MODEL:-gemmae4}"
 
 echo "=== MAKi local stack smoke ==="
@@ -78,6 +79,35 @@ if [[ "$SKIP_CHAT" != "1" ]]; then
   fi
   echo "✅ SSE 수신 (chat stream)"
   echo "$out" | head -n 15
+fi
+
+if [[ "$SKIP_BODY_FROM_IMAGE" != "1" ]]; then
+  echo "→ POST /internal/v1/content/body-from-image (HTTPS 이미지, mmproj 필요, 최대 180초)…"
+  SERVICE_KEY="${SERVICE_API_KEY:-test-service-key}"
+  IMG_URL="${BODY_IMAGE_URL:-https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png}"
+  body_json="$(printf '{"imageUrl":"%s","language":"ko","length":"short"}' "$IMG_URL")"
+  if ! bio="$(
+    curl -sS --max-time 180 -X POST "$GATEWAY_URL/internal/v1/content/body-from-image" \
+      -H 'Content-Type: application/json' \
+      -H "X-Service-Key: $SERVICE_KEY" \
+      -d "$body_json"
+  )"; then
+    echo "❌ body-from-image 요청 실패"
+    exit 1
+  fi
+  if echo "$bio" | grep -q '"error"'; then
+    echo "❌ body-from-image 오류 응답:"
+    echo "$bio" | head -c 1200
+    exit 1
+  fi
+  if ! echo "$bio" | grep -q '"body"'; then
+    echo "❌ 응답에 body 필드 없음:"
+    echo "$bio" | head -c 800
+    exit 1
+  fi
+  echo "✅ body-from-image (E4B+mmproj)"
+  echo "$bio" | head -c 500
+  echo ""
 fi
 
 echo ""

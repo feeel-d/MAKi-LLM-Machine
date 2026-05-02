@@ -1,4 +1,4 @@
-import { completeJsonCompletion, fetchRouterModels, fetchTextEmbedding } from './llama-client.mjs';
+import { completeJsonCompletion, fetchRouterModels, fetchTextEmbedding, parseJsonObjectFromModelText } from './llama-client.mjs';
 import { fetchImageAsDataUrl } from './image-ingest.mjs';
 import { InternalApiError } from './internal-errors.mjs';
 import { resolveLogicalRouterModelId } from './models.mjs';
@@ -18,6 +18,63 @@ const TITLE_STYLES = new Set(['neutral', 'marketing', 'news']);
 const LANGUAGES = new Set(['ko', 'en']);
 const BODY_LENGTHS = new Set(['short', 'medium', 'long']);
 const TODO_PRIORITIES = new Set(['HIGH', 'MEDIUM', 'LOW']);
+
+const HANGUL_RE = /[\uAC00-\uD7A3]/;
+
+/** 모델 출력 문자열에서 CoT(생각의 흐름) 및 불필요한 메타 텍스트 제거 */
+export function stripBodyFromImageCoT(text) {
+  let s = asString(text).trim();
+
+  // 1. "Here's a thinking process" 패턴이 있고 뒤에 한글이 나오면 한글 시작점부터 사용
+  if (/^here'?s\s+(a\s+)?thinking\b/im.test(s) && HANGUL_RE.test(s)) {
+    const allLines = s.split('\n');
+    const hangulLineIdx = allLines.findIndex((l) => HANGUL_RE.test(l));
+    if (hangulLineIdx > 0) {
+      s = allLines.slice(hangulLineIdx).join('\n').trim();
+    }
+  }
+
+  // 2. 단락 단위로 CoT 패턴 검사하여 제거
+  let guard = 0;
+  while (guard < 20) {
+    guard += 1;
+    const parts = s.split(/\n{2,}/);
+    if (parts.length <= 1) break;
+    
+    const firstBlock = parts[0].trim().toLowerCase();
+    const isCot = 
+      firstBlock.includes('thinking process') || 
+      firstBlock.includes('chain of thought') ||
+      firstBlock.startsWith("here's") ||
+      firstBlock.includes('analyze the request') ||
+      /^\d+\.\s+\*\*analyze\*\*/.test(firstBlock);
+
+    if (!isCot) break;
+    s = parts.slice(1).join('\n\n').trim();
+  }
+
+  // 3. 줄 단위로 선행 마커 제거
+  const lines = s.split('\n');
+  let start = 0;
+  for (; start < lines.length && start < 15; start += 1) {
+    const line = lines[start].trim().toLowerCase();
+    if (!line) continue;
+    if (/^#{1,6}\s*(thinking|analyze|constraints?)/.test(line)) continue;
+    if (/^(here'?s|here\s+is)\s+(a\s+)?thinking/.test(line)) continue;
+    if (/^\*{0,2}(analyze|thinking\s+process|drafting)/.test(line)) continue;
+    if (/^\d+\.\s+(\*{1,2})?\s*analyze/.test(line)) continue;
+    break;
+  }
+  s = lines.slice(start).join('\n').trim();
+
+  // 4. 긴 영문 CoT 뒤에 한글 요약이 붙어있는 경우 (앵커 탐색)
+  const anchor = s.search(/\n(?=[^\n]*[\uAC00-\uD7A3])/);
+  if (anchor > 60 && /^[\x00-\x7F\n]{60,}/.test(s.slice(0, anchor))) {
+    s = s.slice(anchor + 1).trim();
+  }
+
+  return s;
+}
 
 export const CONTENT_TASK_MODELS = {
   titleFromText: ROUTER_SLOT_GEMMA_E4B,
@@ -120,16 +177,17 @@ export function createContentGenerationService(dependencies = {}) {
         model,
         requestId,
         retryCount: config.contentRetryCount,
-        temperature: 0.7,
-        maxTokens: bodyMaxTokens(normalized.length),
-        jsonResponseFormat: false,
+        temperature: 0.0,
+        maxTokens: bodyMaxTokens(normalized.length, config),
+        jsonResponseFormat: true,
+        systemPrompt: buildBodyFromImageSystemPrompt(normalized),
         messages: [
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: buildBodyFromImagePrompt(normalized),
+                text: buildBodyFromImageUserPrompt(normalized),
               },
               {
                 type: 'image_url',
@@ -142,11 +200,14 @@ export function createContentGenerationService(dependencies = {}) {
         ],
       });
 
-      const body = validateBodyOutput(completion.parsed?.body ?? completion.text);
-      return {
-        body,
-        model,
-      };
+    const rawBody = extractBodyForBodyFromImage(completion.parsed, completion.text);
+    const sanitized = stripBodyFromImageCoT(rawBody);
+    const body = validateBodyOutput(sanitized);
+
+    return {
+      body,
+      model,
+    };
     },
 
     async proofreadFromText({ config, requestId, input }) {
@@ -503,6 +564,121 @@ export function buildTitleFromTextPrompt(input) {
   return `${buildTitleFromTextSystemPrompt(input)}\n\n${buildTitleFromTextUserContent(input)}`;
 }
 
+/**
+ * body-from-image: 코드펜스·중첩 {"body":...}·잘린 JSON까지 단일 본문 문자열로 정규화.
+ */
+export function extractBodyForBodyFromImage(parsed, text) {
+  const fromParsed = normalizeBodyContentCandidate(unwrapBodyFieldString(parsed?.body));
+  if (fromParsed) {
+    return fromParsed;
+  }
+  const rawText = asString(text);
+  if (!rawText.trim()) {
+    return '';
+  }
+  try {
+    const obj = parseJsonObjectFromModelText(rawText);
+    const inner = normalizeBodyContentCandidate(unwrapBodyFieldString(obj?.body));
+    if (inner) {
+      return inner;
+    }
+  } catch {
+    /* fall through — 잘린 JSON 등 */
+  }
+  const loose = normalizeBodyContentCandidate(extractBodyJsonStringLoose(rawText));
+  if (loose) {
+    return loose;
+  }
+  const stripped = stripOuterCodeFence(rawText).trim();
+  if (stripped.length > 0 && !/"body"\s*:/.test(stripped)) {
+    return stripped;
+  }
+  return '';
+}
+
+function unwrapBodyFieldString(value) {
+  return typeof value === 'string' ? value : '';
+}
+
+function normalizeBodyContentCandidate(raw) {
+  const s0 = stripOuterCodeFence(asString(raw)).trim();
+  if (!s0) {
+    return '';
+  }
+  let s = s0;
+  for (let depth = 0; depth < 3; depth += 1) {
+    if (!s.startsWith('{') || !/"body"\s*:/.test(s)) {
+      break;
+    }
+    try {
+      const o = JSON.parse(s);
+      if (o && typeof o === 'object' && !Array.isArray(o) && typeof o.body === 'string') {
+        const inner = stripOuterCodeFence(o.body).trim();
+        if (!inner) {
+          return s;
+        }
+        s = inner;
+        continue;
+      }
+    } catch {
+      break;
+    }
+    break;
+  }
+  return s.trim();
+}
+
+function stripOuterCodeFence(s) {
+  const trimmed = String(s).trim();
+  if (!trimmed.startsWith('```')) {
+    return trimmed;
+  }
+  const lines = trimmed.split('\n');
+  if (lines[0].startsWith('```')) {
+    lines.shift();
+  }
+  if (lines.length > 0 && lines[lines.length - 1].trim().startsWith('```')) {
+    lines.pop();
+  }
+  return lines.join('\n').trim();
+}
+
+/** JSON 전체 파싱 실패 시 "body":"… 값 추출(스트림 잘림 시 가능한 만큼) */
+function extractBodyJsonStringLoose(text) {
+  const m = text.match(/"body"\s*:\s*"/);
+  if (m == null || m.index === undefined) {
+    return '';
+  }
+  let i = m.index + m[0].length;
+  let out = '';
+  let esc = false;
+  for (; i < text.length; i += 1) {
+    const c = text[i];
+    if (esc) {
+      if (c === 'n') {
+        out += '\n';
+      } else if (c === 'r') {
+        out += '\r';
+      } else if (c === 't') {
+        out += '\t';
+      } else {
+        out += c;
+      }
+      esc = false;
+      continue;
+    }
+    if (c === '\\') {
+      esc = true;
+      continue;
+    }
+    if (c === '"') {
+      break;
+    }
+    out += c;
+  }
+  return out.trim();
+}
+
 export function buildTitleFromImagePrompt(input) {
   const languageLabel =
     input.language === 'auto'
@@ -518,18 +694,57 @@ export function buildTitleFromImagePrompt(input) {
   return `Create one short title for this image (${input.style}, max ${input.maxLength} chars). ${langInstruction} Return JSON: {"title":"..."}${context}`;
 }
 
-export function buildBodyFromImagePrompt(input) {
+/** System: 규칙·출력 형식 */
+export function buildBodyFromImageSystemPrompt(input) {
   const languageLabel = input.language === 'en' ? 'English' : 'Korean';
-  const lengthGuide =
-    input.length === 'short'
-      ? 'Write around 1-2 short paragraphs.'
-      : input.length === 'long'
-        ? 'Write around 4-6 detailed paragraphs.'
-        : 'Write around 2-4 paragraphs.';
+  if (input.language === 'ko') {
+    return [
+      '당신은 비즈니스 어시스턴트입니다. 이미지를 분석하여 한국어로 핵심 내용을 요약하세요.',
+      '반드시 하나의 JSON 객체로만 응답하세요. 키 이름은 "body"입니다.',
+      '- "body" 값은 반드시 이미지의 핵심 사실을 담은 3줄 요약이어야 합니다.',
+      '- 줄 바꿈은 \\n을 사용하세요.',
+      '- 생각의 흐름(thinking process), 분석 단계, 서론, 부연 설명은 절대 포함하지 마세요.',
+      '- "Here\'s a thinking process"와 같은 문구로 시작하지 마세요.',
+      '- 오직 요약된 3줄의 텍스트만 "body" 값에 넣으세요.',
+      '- 반드시 한국어로만 작성하세요. 영어 문장을 쓰지 마세요.',
+      '- 만약 "body" 값이 비어있거나 "..."이면 실패로 간주합니다. 반드시 실제 내용을 작성하세요.',
+      '- JSON 형식 예시: {"body": "첫 번째 사실\\n두 번째 사실\\n세 번째 사실"}',
+      '- 이미지에 텍스트가 많으면 가장 중요한 3가지만 골라 요약하세요.',
+    ].join('\n');
+  }
+  return [
+    `You are a business assistant. Analyze the image and provide a factual summary in ${languageLabel}.`,
+    'Return exactly one JSON object with the key "body".',
+    '- The "body" value must be a 3-line factual summary of the image.',
+    '- Use \\n for line breaks.',
+    '- NO thinking process, NO analysis steps, NO introductory text.',
+    '- DO NOT start with "Here\'s a thinking process".',
+    '- Example: {"body": "Fact 1\\nFact 2\\nFact 3"}',
+  ].join('\n');
+}
 
-  const titleHint = input.titleHint ? ` Title hint: ${input.titleHint}.` : '';
-  const tone = input.tone ? ` Tone: ${input.tone}.` : '';
-  return `Write a ${languageLabel} article body from this image. ${lengthGuide} Return JSON: {"body":"..."}${titleHint}${tone}`;
+/** User: 과제·톤·힌트 */
+export function buildBodyFromImageUserPrompt(input) {
+  const languageLabel = input.language === 'en' ? 'English' : 'Korean';
+  const titleHint = input.titleHint ? `\n참고: ${input.titleHint}` : '';
+  const tone = input.tone ? `\n톤: ${input.tone}` : '';
+
+  if (input.language === 'ko') {
+    return [
+      `이미지 내용을 한국어로 3줄 요약하여 JSON {"body":"..."} 형식으로 출력하세요.${titleHint}${tone}`,
+      '다른 텍스트 없이 오직 JSON 객체 하나만 출력하세요. 반드시 한국어로만 작성하세요. 영어는 절대 사용하지 마세요. "..." 대신 실제 내용을 작성하세요.',
+    ].join('\n');
+  }
+
+  return [
+    `Summarize this image in exactly 3 lines (${languageLabel}) and output as JSON.${titleHint}${tone}`,
+    'Output ONLY the JSON: {"body":"..."}. No other text. Do not use "..." in the output.',
+  ].join('\n');
+}
+
+/** 테스트·문서 호환 */
+export function buildBodyFromImagePrompt(input) {
+  return `${buildBodyFromImageSystemPrompt(input)}\n\n${buildBodyFromImageUserPrompt(input)}`;
 }
 
 export function buildProofreadFromTextPrompt(input) {
@@ -887,14 +1102,17 @@ function normalizePriority(value) {
   return TODO_PRIORITIES.has(priority) ? priority : undefined;
 }
 
-function bodyMaxTokens(length) {
+function bodyMaxTokens(length, config) {
+  const shortCap = config?.contentBodyMaxTokensShort ?? 320;
+  const mediumCap = config?.contentBodyMaxTokensMedium ?? 512;
+  const longCap = config?.contentBodyMaxTokensLong ?? 768;
   if (length === 'short') {
-    return 360;
+    return shortCap;
   }
   if (length === 'long') {
-    return 1200;
+    return longCap;
   }
-  return 760;
+  return mediumCap;
 }
 
 function asString(value) {

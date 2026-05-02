@@ -21,6 +21,7 @@ need_file() {
   case "$f" in
     */gemma4-26b.gguf) [[ "$sz" -ge 12000000000 ]] ;;
     */gemma4-e4b.gguf) [[ "$sz" -ge 5000000000 ]] ;; # Q4_K_M 전체 약 5.4GB
+    */mmproj-google_gemma-4-E4B-it-f16.gguf) [[ "$sz" -ge 900000000 ]] ;;
     *) [[ "$sz" -ge 1000000 ]] ;;
   esac
 }
@@ -29,9 +30,9 @@ mkdir -p "$RUNTIME_DIR"
 
 required_models=()
 if [[ "$MAKI_ROUTER_PROFILE" == "full" ]]; then
-  required_models=(gemma4-26b.gguf gemma4-e4b.gguf)
+  required_models=(gemma4-26b.gguf gemma4-e4b.gguf mmproj-google_gemma-4-E4B-it-f16.gguf)
 else
-  required_models=(gemma4-e4b.gguf)
+  required_models=(gemma4-e4b.gguf mmproj-google_gemma-4-E4B-it-f16.gguf)
 fi
 
 for name in "${required_models[@]}"; do

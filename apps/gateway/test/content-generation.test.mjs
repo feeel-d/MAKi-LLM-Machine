@@ -4,6 +4,7 @@ import {
   createContentGenerationService,
   validateTitleFromTextInput,
   CONTENT_TASK_MODELS,
+  extractBodyForBodyFromImage,
 } from '../lib/content-generation.mjs';
 import { InternalApiError } from '../lib/internal-errors.mjs';
 
@@ -90,7 +91,39 @@ test('bodyFromImage defaults to medium length', async () => {
   });
 
   assert.equal(result.body, '자동 생성 본문');
-  assert.equal(calls[0].maxTokens, 760);
+  assert.equal(calls[0].maxTokens, 512);
+  assert.equal(calls[0].temperature, 0.1);
+  assert.match(calls[0].systemPrompt, /factual 3-line summary/i);
+});
+
+test('extractBodyForBodyFromImage unwraps fence and nested body string', () => {
+  assert.equal(
+    extractBodyForBodyFromImage(
+      { body: '```json\n{"body":"내부 최종"}\n```' },
+      '',
+    ),
+    '내부 최종',
+  );
+  assert.equal(
+    extractBodyForBodyFromImage({ body: '{"body":"둘째"}' }, ''),
+    '둘째',
+  );
+  assert.equal(
+    extractBodyForBodyFromImage(
+      null,
+      '```json\n{"body":"텍스트만"}\n```',
+    ),
+    '텍스트만',
+  );
+});
+
+test('extractBodyForBodyFromImage uses plain text when no body key', () => {
+  assert.equal(extractBodyForBodyFromImage(null, '순수 본문만 있음'), '순수 본문만 있음');
+});
+
+test('extractBodyForBodyFromImage recovers truncated JSON body value', () => {
+  const partial = '{"body":"잘림 테스트 본문이 계속';
+  assert.equal(extractBodyForBodyFromImage(null, partial), '잘림 테스트 본문이 계속');
 });
 
 test('proofreadFromText uses gemmae4 and returns normalized corrected text', async () => {
