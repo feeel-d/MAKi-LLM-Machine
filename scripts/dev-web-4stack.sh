@@ -9,6 +9,8 @@ RUNTIME_DIR="${RUNTIME_DIR:-$ROOT_DIR/.runtime}"
 MODELS_DIR="${MODELS_DIR:-$HOME/models}"
 ROUTER_PORT="${ROUTER_PORT:-8081}"
 GATEWAY_PORT="${GATEWAY_PORT:-3001}"
+MAKI_ROUTER_PROFILE="${MAKI_ROUTER_PROFILE:-e4}"
+export MAKI_ROUTER_PROFILE
 
 # 부분 다운로드 방지 — 대략적 최소 크기 (Q4_K_M, bartowski 기본 기준)
 need_file() {
@@ -25,7 +27,14 @@ need_file() {
 
 mkdir -p "$RUNTIME_DIR"
 
-for name in gemma4-26b.gguf gemma4-e4b.gguf; do
+required_models=()
+if [[ "$MAKI_ROUTER_PROFILE" == "full" ]]; then
+  required_models=(gemma4-26b.gguf gemma4-e4b.gguf)
+else
+  required_models=(gemma4-e4b.gguf)
+fi
+
+for name in "${required_models[@]}"; do
   if ! need_file "$MODELS_DIR/$name"; then
     echo "필요 파일 없음 또는 너무 작음: $MODELS_DIR/$name"
     echo "다운로드: ./setup-local-llm.sh 또는 ./scripts/download-gemma-models.sh"
@@ -51,7 +60,7 @@ cd "$ROOT_DIR"
 export VITE_API_BASE_URL="http://127.0.0.1:${GATEWAY_PORT}"
 export LLAMA_SERVER_URL="${LLAMA_SERVER_URL:-http://127.0.0.1:${ROUTER_PORT}}"
 
-echo "Starting llama-server router (Gemma 26B + E4B)…"
+echo "Starting llama-server router (profile=$MAKI_ROUTER_PROFILE)…"
 : >"$RUNTIME_DIR/router-dev.log"
 nohup "$ROOT_DIR/scripts/run-llama-router.sh" >>"$RUNTIME_DIR/router-dev.log" 2>&1 &
 ROUTER_PID=$!

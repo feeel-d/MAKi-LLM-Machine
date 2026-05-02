@@ -28,7 +28,7 @@ function modelDebugFields(model) {
   return {
     modelId: m,
     quantLabel: q ? q[1] : undefined,
-    modelFamily: /gemma/i.test(m) ? 'gemma' : /llama|mistral|qwen/i.test(m) ? 'other' : undefined,
+    modelFamily: /gemma/i.test(m) ? 'gemma' : undefined,
   };
 }
 

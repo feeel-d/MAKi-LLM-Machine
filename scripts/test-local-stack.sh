@@ -31,7 +31,7 @@ echo "✅ GET /api/models"
 head -c 400 /tmp/maki-models.json
 echo ""
 
-VERIFY_PROFILE="${VERIFY_PROFILE:-full}"
+VERIFY_PROFILE="${VERIFY_PROFILE:-e4}"
 
 if [[ "$SKIP_ROUTER" != "1" ]]; then
   if ! curl -fsS "$ROUTER_URL/v1/models" >/tmp/maki-router-models.json 2>/tmp/maki-router.err; then

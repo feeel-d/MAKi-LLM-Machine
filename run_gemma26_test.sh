@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Gemma 4 26B — DeepSeek 테스트와 동일하게 ctx 를 내려가며 재시도 (메모리·KV 한계 대비)
+# Gemma 4 26B — ctx 를 낮춰가며 재시도 (메모리·KV 한계 대비)
 set -euo pipefail
 export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 MODEL="${MODEL:-$HOME/models/gemma4-26b.gguf}"

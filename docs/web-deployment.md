@@ -46,7 +46,7 @@ Gemma GGUF가 없으면 `~/models/gemma4-26b.gguf`, `gemma4-e4b.gguf` 를 먼저
 
 ### 2.1 로컬 자체 테스트 (푸시·Funnel 전에)
 
-**GGUF 단독**(DeepSeek/Qwen/Gemma와 동일 패턴): `./run_deepseek_test.sh`, `./run_qwen_test.sh`, `./run_gemma26_test.sh`, `./run_gemmae4_test.sh`
+**GGUF 단독**(로컬 `llama-completion`): `./run_gemma26_test.sh`, `./run_gemmae4_test.sh`
 
 **게이트웨이+라우터 HTTP**(기동 후):
 
@@ -58,14 +58,14 @@ npm run test:local        # 다른 터미널 — health / models / chat 스트�
 
 웹 UI(`npm run dev:web` 또는 GitHub Pages)에서 쓰는 것과 같은 API 경로를 `curl`로 확인합니다. 통과 후 푸시하면 Pages에서도 동일 Gateway URL로 동작을 맞출 수 있습니다.
 
-**`start-all` 동작:** 기본은 **e4 → g3 → dq2** 순으로 자동 프로필 전환합니다. 이미지 API 안정성이 가장 중요하면 `e4` 프로필이 기본 선택이고, `full`(Gemma26 포함)이 필요할 때만 `MAKI_ROUTER_PROFILE=full` 로 명시해서 올립니다. 슬롯이 `loaded` 될 때까지 폴링하며, 로드 실패(메모리·파일)면 **dq2**(DeepSeek+Qwen만)까지 내려가도 스택이 뜨도록 합니다. 고정하려면 `MAKI_ROUTER_PROFILE=e4 ./scripts/start-all.sh`(또는 `full`/`dq2`) / 자동 전환 끄기: `MAKI_NO_AUTO_DOWNGRADE=1`. 환경 변수: `ROUTER_WAIT_ROUNDS`, `SLOT_POLL_ROUNDS` / `SLOT_POLL_SEC`(슬롯 폴링).
+**`start-all` 동작:** Gemma 슬롯 라우터(`scripts/run-llama-router.sh`, 기본 `8081`)를 띄운 뒤 HTTP가 올라올 때까지 기다리고, `gemma26`·`gemmae4` 가 모두 `loaded` 인지 폴링합니다. 이어서 임베딩용 `llama-server`(기본 `8083`)와 게이트웨이(`3001`)를 기동합니다. 환경 변수: `ROUTER_WAIT_ROUNDS`, `SLOT_POLL_ROUNDS`, `SLOT_POLL_SEC`.
 
 게이트웨이는 llama-server `/v1/models`에서 **`status.value === loaded`** 인 슬롯만 “사용 가능”으로 노출합니다(로드 실패·`loading` 은 제외).
 
 ## 3. llama-server router 실행
 
-기본 모델 경로는 `~/models/deepseek.gguf`, `~/models/qwen.gguf`, `~/models/gemma4-26b.gguf`, `~/models/gemma4-e4b.gguf` 입니다.  
-이미지 분석용 `gemmae4` 슬롯은 기본적으로 Hugging Face의 `ggml-org/Qwen2-VL-2B-Instruct-GGUF` 를 사용합니다. 로컬 `gemma4-e4b.gguf` 는 레거시/대체 설정용입니다.
+텍스트 라우터 기본 모델 경로는 `~/models/gemma4-26b.gguf`, `~/models/gemma4-e4b.gguf` 입니다.  
+이미지 분석용 `gemmae4` 백킹은 설정에 따라 Hugging Face 멀티모달(예: `ggml-org/Qwen2-VL-2B-Instruct-GGUF`) 또는 로컬 GGUF를 쓸 수 있습니다. 세부는 `config/llama-router-models.template.ini`·`scripts/run-llama-router.sh` 를 참고하세요.
 
 ```bash
 ./scripts/run-llama-router.sh
@@ -73,11 +73,11 @@ npm run test:local        # 다른 터미널 — health / models / chat 스트�
 
 환경 변수로 조정 가능한 값:
 
-- `DEEPSEEK_CTX`, `QWEN_CTX`: 기본 `16384`; `GEMMA26_CTX`, `GEMMAE4_CTX`: 기본 `8192`
-- `DEEPSEEK_MODEL_PATH`, `QWEN_MODEL_PATH`, `GEMMA26_MODEL_PATH`, `GEMMAE4_MODEL_PATH`
-- `MODELS_MAX`: 기본 `4` (프리셋 슬롯 수와 맞춤; 메모리에 따라 낮출 수 있음)
+- `GEMMA26_CTX`, `GEMMAE4_CTX`: 기본 `4096` / `2048` (`scripts/run-llama-router.sh`)
+- `GEMMA26_MODEL_PATH`, `GEMMAE4_MODEL_PATH`
+- `MODELS_MAX`: 기본 `2` (슬롯 `gemma26`·`gemmae4` 와 맞춤)
 - `ROUTER_PORT`: 기본 `8081` (nginx 등이 8080을 쓰는 경우가 많음)
-- `MAKI_ROUTER_PROFILE`: `full`(4), `e4`(DeepSeek+Qwen+GemmaE4), `g3`(DeepSeek+Qwen+Gemma26), `dq2`(2)
+- 슬롯 검증: `scripts/router-verify-slots.mjs` 의 `full` 프로필 → `gemma26`, `gemmae4` 모두 `loaded`
 - `ROUTER_PARALLEL`, `ROUTER_BATCH`, `ROUTER_UBATCH`: 기본 `1`, `512`, `256` (Gemma OOM 완화)
 - `LLAMA_API_KEY`: 내부 llama-server 보호가 필요할 때 사용
 
@@ -214,8 +214,7 @@ curl http://127.0.0.1:3001/api/health
 curl http://127.0.0.1:3001/api/models
 ```
 
-`All` 모드는 게이트웨이가 DeepSeek와 Qwen을 동시에 호출하고, `Gemma All` 모드는 `gemma26`와 `gemmae4`를 동시에 호출합니다. SSE는 모델별 이벤트로 합쳐져 브라우저에 전달됩니다.  
-실전에서는 메모리 압박이 적은 `e4` 프로필이 이미지 API 성공률이 가장 높습니다.
+`Gemma All` 모드는 게이트웨이가 `gemma26`와 `gemmae4`를 동시에 호출합니다. SSE는 모델별 이벤트로 합쳐져 브라우저에 전달됩니다.
 
 ## 9. GitHub Pages에서 `Gateway Issue` / `Failed to fetch` 일 때
 
@@ -266,7 +265,7 @@ Mac에서 `curl -sS http://127.0.0.1:8081/v1/models` 로 `gemmae4` 가 목록에
 ```bash
 ./scripts/update-llama-cpp.sh
 ./scripts/stop-all.sh && ./scripts/start-all.sh
-VERIFY_PROFILE=e4 CHAT_MODEL=gemmae4 npm run test:local
+VERIFY_PROFILE=full CHAT_MODEL=gemmae4 npm run test:local
 ```
 
-Gemma 없이만 쓰려면 `MAKI_ROUTER_PROFILE=dq2` 로 DeepSeek+Qwen만 올릴 수 있습니다(`scripts/run-llama-router.sh`).
+메모리만 한 슬롯에 쓰려면 `config/llama-router-models.template.ini` 에서 한 슬롯만 `load-on-startup = true` 로 두고 `MODELS_MAX` 를 조정합니다.

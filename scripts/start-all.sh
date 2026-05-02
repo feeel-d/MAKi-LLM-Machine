@@ -20,6 +20,9 @@ ROUTER_PORT="${ROUTER_PORT:-8081}"
 GATEWAY_PORT="${GATEWAY_PORT:-3001}"
 # 라우터(특히 Gemma) 기동이 느리면 늘림
 ROUTER_WAIT_ROUNDS="${ROUTER_WAIT_ROUNDS:-120}"
+MAKI_ROUTER_PROFILE="${MAKI_ROUTER_PROFILE:-e4}"
+export MAKI_ROUTER_PROFILE
+ROUTER_VERIFY_PROFILE="${ROUTER_VERIFY_PROFILE:-$MAKI_ROUTER_PROFILE}"
 
 mkdir -p "$RUNTIME_DIR"
 
@@ -118,7 +121,7 @@ start_background() {
 
 start_router() {
   stop_router
-  echo "Starting llama router (Gemma 26B + E4B) …"
+  echo "Starting llama router (profile=${MAKI_ROUTER_PROFILE:-e4}) …"
   : >"$ROUTER_LOG_FILE"
   nohup "$ROOT_DIR/scripts/run-llama-router.sh" >>"$ROUTER_LOG_FILE" 2>&1 &
   local pid=$!
@@ -147,17 +150,17 @@ wait_for_slots() {
   verify_slots "$profile"
 }
 
-# --- Router: Gemma 26B + E4B (2 slots) ---
+# --- 라우터: MAKI_ROUTER_PROFILE=e4(기본)면 gemmae4만, full이면 gemma26+gemmae4 ---
 start_router
 if ! wait_for_http "http://127.0.0.1:${ROUTER_PORT}/v1/models" "router" "$ROUTER_WAIT_ROUNDS"; then
   echo "❌ 라우터 HTTP 대기 실패. 로그: $ROUTER_LOG_FILE" >&2
   exit 1
 fi
-if ! wait_for_slots full; then
-  echo "❌ 라우터 슬롯 검증 실패 (필요: gemma26, gemmae4). GGUF·메모리·로그: $ROUTER_LOG_FILE" >&2
+if ! wait_for_slots "$ROUTER_VERIFY_PROFILE"; then
+  echo "❌ 라우터 슬롯 검증 실패 (프로필=$ROUTER_VERIFY_PROFILE). GGUF·메모리·로그: $ROUTER_LOG_FILE" >&2
   exit 1
 fi
-echo "✅ 라우터 슬롯: gemma26, gemmae4 loaded"
+echo "✅ 라우터 슬롯: profile=$ROUTER_VERIFY_PROFILE OK"
 
 # --- Embedding server (nomic @ 8083, 채팅 라우터와 분리) ---
 EMBED_PORT="${EMBED_PORT:-8083}"

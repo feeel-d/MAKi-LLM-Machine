@@ -6,9 +6,10 @@
 import process from 'node:process';
 
 const url = process.argv[2] ?? 'http://127.0.0.1:8081/v1/models';
-const profile = process.argv[3] ?? 'full';
+const profile = process.argv[3] ?? 'e4';
 
 const required = {
+  e4: ['gemmae4'],
   full: ['gemma26', 'gemmae4'],
 };
 
@@ -27,6 +28,21 @@ function isLoaded(m) {
     return false;
   }
   return s.value === 'loaded';
+}
+
+/** 논리 슬롯 id가 /v1/models 의 로드된 id(또는 HF id 패턴)와 일치하는지 */
+function slotSatisfied(loadedIds, logicalId) {
+  if (loadedIds.has(logicalId)) {
+    return true;
+  }
+  const ids = [...loadedIds];
+  if (logicalId === 'gemmae4') {
+    return ids.some((id) => /gemma-4-E4B/i.test(id));
+  }
+  if (logicalId === 'gemma26') {
+    return ids.some((id) => /gemma-4-26B/i.test(id) || /gemma.*26B/i.test(id));
+  }
+  return false;
 }
 
 try {
@@ -50,8 +66,8 @@ try {
     }
   }
 
-  const need = required[profile] ?? required.full;
-  const missing = need.filter((id) => !loaded.has(id));
+  const need = required[profile] ?? required.e4;
+  const missing = need.filter((id) => !slotSatisfied(loaded, id));
 
   if (missing.length === 0) {
     console.log(`router-verify-slots: OK profile=${profile} loaded=${[...loaded].join(',')}`);

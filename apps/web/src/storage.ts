@@ -14,9 +14,6 @@ function normalizeModelKind(raw: string | undefined | null): ModelKind {
   if (raw === 'gemma26' || raw === 'gemmae4' || raw === 'gemma_all') {
     return raw;
   }
-  if (raw === 'deepseek' || raw === 'qwen' || raw === 'all') {
-    return 'gemmae4';
-  }
   return 'gemmae4';
 }
 

@@ -56,15 +56,15 @@
 1. `brew install git cmake wget`
 2. `~/llama.cpp` 클론 및 CMake Release 빌드
 3. `~/models` 생성 및 GGUF 다운로드 (기본 URL, `wget -c`로 이어받기)
-4. `run_deepseek_test.sh`, `run_qwen_test.sh` 생성
-5. `~/.zshrc`에 `deepseek-run` / `qwen-run` 함수 추가 (이미 있으면 생략)
+4. `run_gemma26_test.sh`, `run_gemmae4_test.sh` 생성
+5. `~/.zshrc`에 `gemmae4-run` 함수 추가 (이미 있으면 생략)
 
 환경 변수:
 
 - `SKIP_DOWNLOAD=1` — 모델 다운로드 생략  
 - `SKIP_ZSHRC=1` — `.zshrc` 수정 생략  
 - `FORCE_LLAMA_REBUILD=1` — llama.cpp 강제 재빌드  
-- `LLAMA_CPP_ROOT`, `MODELS_DIR`, `DEEPSEEK_URL`, `QWEN_URL`, `GEMMA26_URL`, `GEMMAE4_URL` — 경로·URL 재정의  
+- `LLAMA_CPP_ROOT`, `MODELS_DIR`, `GEMMA26_URL`, `GEMMAE4_URL` — 경로·URL 재정의  
 
 ---
 
@@ -72,14 +72,12 @@
 
 | 파일 | Hugging Face 소스 (요약) | 용도 |
 |------|--------------------------|------|
-| `~/models/deepseek.gguf` | `bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF` → `DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf` | 코드·분석·지시 따르기 |
-| `~/models/qwen.gguf` | `bartowski/Qwen2.5-7B-Instruct-GGUF` → `Qwen2.5-7B-Instruct-Q4_K_M.gguf` | 범용 지시·정리 (학습 컨텍스트 32k — 65k 지정 시 경고만 나올 수 있음) |
 | `~/models/gemma4-26b.gguf` | `bartowski/google_gemma-4-26B-A4B-it-GGUF` → `google_gemma-4-26B-A4B-it-Q4_K_M.gguf` | Gemma 4 (26B·A4B instruct) |
-| `~/models/gemma4-e4b.gguf` | `bartowski/google_gemma-4-E4B-it-GGUF` → `google_gemma-4-E4B-it-Q4_K_M.gguf` | Gemma 4 (E4B instruct, 26B 대비 작은 쪽) |
+| `~/models/gemma4-e4b.gguf` | `bartowski/google_gemma-4-E4B-it-GGUF` → `google_gemma-4-E4B-it-Q4_K_M.gguf` | Gemma 4 (E4B instruct) |
 
 다른 양자화/모델로 바꿀 때는 같은 경로에 덮어쓰거나, 스크립트의 `MODEL` 환경 변수를 지정합니다.
 
-**라우터(웹 게이트웨이)와 메모리:** `llama-server` 프리셋에 위 네 종류를 모두 올리면 통합 메모리 사용량이 매우 커질 수 있습니다. OOM이나 스왑이 나면 `config/llama-router-models.template.ini`에서 일부 모델만 `load-on-startup = true`로 두거나, `GEMMA26_CTX` / `GEMMAE4_CTX` 등을 낮추고, `scripts/run-llama-router.sh`의 `MODELS_MAX`(기본 4)와 실제 필요한 동시 로드 수를 맞춥니다. Ollama용 `gemma4` 가이드([gist](https://gist.github.com/greenstevester/fc49b4e60a4fef9effc79066c1033ae5))와 **런타임은 다르지만** 같은 Gemma 4 제품군을 참고할 때는 GGUF 경로·용량을 기준으로 판단하면 됩니다.
+**라우터(웹 게이트웨이)와 메모리:** `llama-server` 프리셋에 두 Gemma 슬롯을 모두 올리면 통합 메모리 사용량이 커질 수 있습니다. OOM이나 스왑이 나면 `config/llama-router-models.template.ini`에서 일부 슬롯만 `load-on-startup = true`로 두거나, `GEMMA26_CTX` / `GEMMAE4_CTX` 등을 낮추고, `scripts/run-llama-router.sh`의 `MODELS_MAX`(기본 `2`)와 실제 필요한 동시 로드 수를 맞춥니다. Ollama용 `gemma4` 가이드([gist](https://gist.github.com/greenstevester/fc49b4e60a4fef9effc79066c1033ae5))와 **런타임은 다르지만** 같은 Gemma 4 제품군을 참고할 때는 GGUF 경로·용량을 기준으로 판단하면 됩니다.
 
 ---
 
@@ -87,14 +85,12 @@
 
 설치 스크립트가 추가하는 **함수** (이미 등록되어 있으면 중복 추가 안 함):
 
-- `deepseek-run …` — `llama-completion` + `deepseek.gguf`, `--ctx-size 32768`, `--temp 0.6`, `-no-cnv`  
-- `qwen-run …` — 동일 바이너리 + `qwen.gguf`, `--ctx-size 65536`, `--temp 0.7`, `-no-cnv`  
+- `gemmae4-run …` — `llama-completion` + `gemma4-e4b.gguf`, `--ctx-size 16384`, `--temp 0.7`, `-no-cnv`  
 
 예:
 
 ```bash
-deepseek-run -p "한 문장으로 요약해줘: ..."
-qwen-run -p "구조적으로 정리해줘: ..."
+gemmae4-run -p "한 문장으로 요약해줘: ..."
 ```
 
 ---
@@ -103,14 +99,12 @@ qwen-run -p "구조적으로 정리해줘: ..."
 
 | 스크립트 | 동작 |
 |----------|------|
-| `./run_deepseek_test.sh` | 컨텍스트 65536→49152→32768→16384 순으로 재시도 후 성공 시 종료 |
-| `./run_qwen_test.sh` | 고정 프롬프트로 단일 추론 테스트 |
-| `./run_gemma26_test.sh` | Gemma 4 26B — DeepSeek와 같이 ctx 16384→8192→4096 재시도 |
-| `./run_gemmae4_test.sh` | Gemma 4 E4B — Qwen과 같이 단일 ctx(16384) 스모크 |
-| `npm run test:local` | **라우터(8081)+게이트웨이(3001) 기동 후** `/api/health`, `/api/models`, `POST /api/chat/stream`(기본 `deepseek` 한 줄) 검증 |
+| `./run_gemma26_test.sh` | Gemma 4 26B — ctx 16384→8192→4096 재시도 |
+| `./run_gemmae4_test.sh` | Gemma 4 E4B — 단일 ctx 스모크 |
+| `npm run test:local` | **라우터(8081)+게이트웨이(3001) 기동 후** `/api/health`, `/api/models`, `POST /api/chat/stream`(기본 `gemmae4`) 검증 |
 | `npm run test:all` | `npm test`(게이트웨이 단위) + `test:local` |
 
-`test:local` 옵션: `SKIP_CHAT=1`(헬스·모델만), `SKIP_ROUTER=1`(게이트웨이만), `CHAT_MODEL=qwen` 등.
+`test:local` 옵션: `SKIP_CHAT=1`(헬스·모델만), `SKIP_ROUTER=1`(게이트웨이만), `CHAT_MODEL=gemmae4` 등.
 
 ---
 
@@ -157,5 +151,5 @@ llama.cpp:      ~/llama.cpp/build/bin/
 1. **로컬 게이트웨이:** `curl -sS http://127.0.0.1:3001/api/health` → JSON에 `"status":"ok"`.
 2. **Tailscale Funnel:** `tailscale funnel --bg 3001` (`scripts/start-funnel.sh` 동일). `tailscale funnel status` 의 `https://....ts.net` 를 브라우저 Gateway URL에 넣는다 (게이트웨이 포트와 동일해야 함).
 3. **nginx가 443/80 앞단일 때:** 전역 `301` 으로 `app.markhub.ai` 등으로 몰면 GitHub Pages 프론트가 API JSON 대신 HTML/리다이렉트를 받는다. `location ^~ /api/` 는 `proxy_pass http://127.0.0.1:3001;` 로 두거나, Funnel 전용 호스트만 게이트웨이에 붙인다. 레포 참고: `deploy/macos/nginx-maki-ink-api-proxy.conf`.
-4. **라우터 포트:** 기본 `8081` (`ROUTER_PORT`). nginx·다른 서비스가 8080을 쓰는 경우와 충돌하지 않게 맞춘다. Gemma 없이 DeepSeek+Qwen만 쓰려면 `MAKI_ROUTER_PROFILE=dq2` (`scripts/run-llama-router.sh`).
-5. **Gemma4 아키텍처 오류:** `unknown model architecture: "gemma4"` 이면 llama.cpp를 최신으로 다시 빌드해야 한다. `./scripts/update-llama-cpp.sh` 실행 후 `./scripts/stop-all.sh && ./scripts/start-all.sh`, 그리고 `VERIFY_PROFILE=e4 CHAT_MODEL=gemmae4 npm run test:local` 로 확인.
+4. **라우터 포트:** 기본 `8081` (`ROUTER_PORT`). nginx·다른 서비스가 8080을 쓰는 경우와 충돌하지 않게 맞춘다.
+5. **Gemma4 아키텍처 오류:** `unknown model architecture: "gemma4"` 이면 llama.cpp를 최신으로 다시 빌드해야 한다. `./scripts/update-llama-cpp.sh` 실행 후 `./scripts/stop-all.sh && ./scripts/start-all.sh`, 그리고 `VERIFY_PROFILE=full CHAT_MODEL=gemmae4 npm run test:local` 로 확인.
