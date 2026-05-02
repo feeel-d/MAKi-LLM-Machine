@@ -58,7 +58,7 @@ npm run test:local        # 다른 터미널 — health / models / chat 스트�
 
 웹 UI(`npm run dev:web` 또는 GitHub Pages)에서 쓰는 것과 같은 API 경로를 `curl`로 확인합니다. 통과 후 푸시하면 Pages에서도 동일 Gateway URL로 동작을 맞출 수 있습니다.
 
-**`start-all` 동작:** Gemma 슬롯 라우터(`scripts/run-llama-router.sh`, 기본 `8081`)를 띄운 뒤 HTTP가 올라올 때까지 기다리고, `gemma26`·`gemmae4` 가 모두 `loaded` 인지 폴링합니다. 이어서 임베딩용 `llama-server`(기본 `8083`)와 게이트웨이(`3001`)를 기동합니다. 환경 변수: `ROUTER_WAIT_ROUNDS`, `SLOT_POLL_ROUNDS`, `SLOT_POLL_SEC`.
+**`start-all` 동작:** 기본 `MAKI_ROUTER_PROFILE=e4` — **gemmae4만** 로드·검증합니다. `MAKI_ROUTER_PROFILE=full` 이면 **gemma26+gemmae4** 를 모두 `loaded` 로 폴링합니다. 이어서 임베딩(`8083`)·게이트웨이(`3001`)를 기동합니다. 환경 변수: `ROUTER_WAIT_ROUNDS`, `SLOT_POLL_ROUNDS`, `SLOT_POLL_SEC`, `ROUTER_VERIFY_PROFILE`(기본은 라우터 프로필과 동일).
 
 게이트웨이는 llama-server `/v1/models`에서 **`status.value === loaded`** 인 슬롯만 “사용 가능”으로 노출합니다(로드 실패·`loading` 은 제외).
 
@@ -73,11 +73,12 @@ npm run test:local        # 다른 터미널 — health / models / chat 스트�
 
 환경 변수로 조정 가능한 값:
 
-- `GEMMA26_CTX`, `GEMMAE4_CTX`: 기본 `4096` / `2048` (`scripts/run-llama-router.sh`)
+- `MAKI_ROUTER_PROFILE`: 기본 `e4`(gemmae4 슬롯만, `MODELS_MAX=1`, `llama-router-models-gemmae4.template.ini`) / `full`이면 26B+E4B(`MODELS_MAX=2`)
+- `GEMMA26_CTX`, `GEMMAE4_CTX`: 기본 `4096` / `2048` (`full`일 때만 26B 경로 사용)
 - `GEMMA26_MODEL_PATH`, `GEMMAE4_MODEL_PATH`
-- `MODELS_MAX`: 기본 `2` (슬롯 `gemma26`·`gemmae4` 와 맞춤)
+- `MODELS_MAX`: 프로필에 맞게 기본 `1`(e4) 또는 `2`(full); 필요 시 덮어씀
 - `ROUTER_PORT`: 기본 `8081` (nginx 등이 8080을 쓰는 경우가 많음)
-- 슬롯 검증: `scripts/router-verify-slots.mjs` 의 `full` 프로필 → `gemma26`, `gemmae4` 모두 `loaded`
+- 슬롯 검증: `scripts/router-verify-slots.mjs` — `e4` → `gemmae4`만, `full` → `gemma26`+`gemmae4`
 - `ROUTER_PARALLEL`, `ROUTER_BATCH`, `ROUTER_UBATCH`: 기본 `1`, `512`, `256` (Gemma OOM 완화)
 - `LLAMA_API_KEY`: 내부 llama-server 보호가 필요할 때 사용
 
@@ -265,7 +266,9 @@ Mac에서 `curl -sS http://127.0.0.1:8081/v1/models` 로 `gemmae4` 가 목록에
 ```bash
 ./scripts/update-llama-cpp.sh
 ./scripts/stop-all.sh && ./scripts/start-all.sh
-VERIFY_PROFILE=full CHAT_MODEL=gemmae4 npm run test:local
+VERIFY_PROFILE=e4 CHAT_MODEL=gemmae4 npm run test:local
 ```
 
-메모리만 한 슬롯에 쓰려면 `config/llama-router-models.template.ini` 에서 한 슬롯만 `load-on-startup = true` 로 두고 `MODELS_MAX` 를 조정합니다.
+26B+E4B 둘 다일 때는 `MAKI_ROUTER_PROFILE=full ./scripts/start-all.sh` 후 `VERIFY_PROFILE=full`.
+
+메모리 부담을 줄이려면 기본 **`MAKI_ROUTER_PROFILE=e4`**(`./scripts/start-all.sh`)로 **gemmae4만** 올리고, 26B가 필요할 때만 **`MAKI_ROUTER_PROFILE=full ./scripts/start-all.sh`** 를 사용합니다.
