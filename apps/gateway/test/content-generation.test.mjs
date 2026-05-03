@@ -5,6 +5,8 @@ import {
   validateTitleFromTextInput,
   CONTENT_TASK_MODELS,
   extractBodyForBodyFromImage,
+  sanitizeBodyFromImageLanguage,
+  validateBodyOutput,
 } from '../lib/content-generation.mjs';
 import { InternalApiError } from '../lib/internal-errors.mjs';
 
@@ -67,7 +69,7 @@ test('titleFromImage uses configured model and forwards fetched dataUrl', async 
   assert.equal(content[1].image_url.url, 'data:image/png;base64,AAAA');
 });
 
-test('bodyFromImage defaults to medium length', async () => {
+test('bodyFromImage uses higher default budget and complete-line prompt', async () => {
   const calls = [];
   const service = createContentGenerationService({
     fetchRouterModels: async () => [{ id: CONTENT_TASK_MODELS.bodyFromImage }],
@@ -78,7 +80,7 @@ test('bodyFromImage defaults to medium length', async () => {
     }),
     completeJsonCompletion: async (payload) => {
       calls.push(payload);
-      return { parsed: { body: '자동 생성 본문' } };
+      return { parsed: { body: '첫째 줄.\n둘째 줄.\n셋째 줄.' } };
     },
   });
 
@@ -90,10 +92,11 @@ test('bodyFromImage defaults to medium length', async () => {
     },
   });
 
-  assert.equal(result.body, '자동 생성 본문');
-  assert.equal(calls[0].maxTokens, 512);
+  assert.equal(result.body, '첫째 줄.\n둘째 줄.\n셋째 줄.');
+  assert.equal(calls[0].maxTokens, 640);
   assert.equal(calls[0].temperature, 0.1);
-  assert.match(calls[0].systemPrompt, /factual 3-line summary/i);
+  assert.match(calls[0].systemPrompt, /정확히 3줄만 요약하세요/);
+  assert.match(calls[0].systemPrompt, /완결된 문장이어야 합니다/);
 });
 
 test('extractBodyForBodyFromImage unwraps fence and nested body string', () => {
@@ -119,6 +122,36 @@ test('extractBodyForBodyFromImage unwraps fence and nested body string', () => {
 
 test('extractBodyForBodyFromImage uses plain text when no body key', () => {
   assert.equal(extractBodyForBodyFromImage(null, '순수 본문만 있음'), '순수 본문만 있음');
+});
+
+test('sanitizeBodyFromImageLanguage preserves technical parentheticals', () => {
+  assert.equal(
+    sanitizeBodyFromImageLanguage('프론트엔드: Lexical Editor (WebView) / BucketTicketDetail.tsx', 'ko'),
+    '프론트엔드: Lexical Editor (WebView) / BucketTicketDetail.tsx',
+  );
+});
+
+test('validateBodyOutput rejects incomplete body lines', () => {
+  assert.throws(
+    () => validateBodyOutput('Section 1:\n- Frontend\n- Backend'),
+    (error) => error instanceof InternalApiError && error.code === 'INVALID_BODY_OUTPUT',
+  );
+});
+
+
+test('validateBodyOutput keeps only the first three complete lines', () => {
+  assert.equal(
+    validateBodyOutput('One.\nTwo.\nThree.\nFour.\nFive.'),
+    'One.\nTwo.\nThree.',
+  );
+});
+
+
+test('validateBodyOutput rejoins wrapped lines before clipping to three', () => {
+  assert.equal(
+    validateBodyOutput('One part\ncontinues.\nTwo complete.\nThree starts\ncontinues too.\nFour extra'),
+    'One part continues.\nTwo complete.\nThree starts continues too.',
+  );
 });
 
 test('extractBodyForBodyFromImage recovers truncated JSON body value', () => {

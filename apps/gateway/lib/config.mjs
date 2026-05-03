@@ -43,10 +43,10 @@ export function loadConfig() {
     serviceApiKey:
       process.env.SERVICE_API_KEY ?? process.env.LOCAL_LLM_SERVICE_API_KEY ?? 'test-service-key',
     contentRetryCount: readNumber('CONTENT_RETRY_COUNT', 1),
-    /** body-from-image: 기본은 약 3줄 요약 — 긴 글은 env로 상향 */
-    contentBodyMaxTokensShort: readNumber('CONTENT_BODY_MAX_TOKENS_SHORT', 320),
-    contentBodyMaxTokensMedium: readNumber('CONTENT_BODY_MAX_TOKENS_MEDIUM', 512),
-    contentBodyMaxTokensLong: readNumber('CONTENT_BODY_MAX_TOKENS_LONG', 768),
+    /** body-from-image: 기본 3줄 요약 — short도 여유 있게, 긴 글은 env로 추가 상향 */
+    contentBodyMaxTokensShort: readNumber('CONTENT_BODY_MAX_TOKENS_SHORT', 448),
+    contentBodyMaxTokensMedium: readNumber('CONTENT_BODY_MAX_TOKENS_MEDIUM', 640),
+    contentBodyMaxTokensLong: readNumber('CONTENT_BODY_MAX_TOKENS_LONG', 896),
     imageFetchTimeoutMs: readNumber('IMAGE_FETCH_TIMEOUT_MS', 15_000),
     maxImageBytes: readNumber('MAX_IMAGE_BYTES', 8 * 1024 * 1024),
     allowedImageMime,

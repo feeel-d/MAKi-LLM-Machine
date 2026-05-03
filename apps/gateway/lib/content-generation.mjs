@@ -22,6 +22,16 @@ const TODO_PRIORITIES = new Set(['HIGH', 'MEDIUM', 'LOW']);
 const HANGUL_RE = /[\uAC00-\uD7A3]/;
 
 /** 모델 출력 문자열에서 CoT(생각의 흐름) 및 불필요한 메타 텍스트 제거 */
+export function sanitizeBodyFromImageLanguage(text, language) {
+  let s = asString(text).trim();
+  if (language !== 'ko' || !HANGUL_RE.test(s)) {
+    return s;
+  }
+
+  s = s.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  return s;
+}
+
 export function stripBodyFromImageCoT(text) {
   let s = asString(text).trim();
 
@@ -172,42 +182,57 @@ export function createContentGenerationService(dependencies = {}) {
         config,
       });
 
-      const completion = await runJsonCompletion({
-        config,
-        model,
-        requestId,
-        retryCount: config.contentRetryCount,
-        temperature: 0.0,
-        maxTokens: bodyMaxTokens(normalized.length, config),
-        jsonResponseFormat: true,
-        systemPrompt: buildBodyFromImageSystemPrompt(normalized),
-        messages: [
-          {
-            role: 'user',
-            content: [
+      const maxAttempts = Math.max(1, Number(config.contentRetryCount ?? 0) + 1);
+      let lastError;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+          const completion = await runJsonCompletion({
+            config,
+            model,
+            requestId,
+            retryCount: 0,
+            temperature: 0.1,
+            maxTokens: bodyMaxTokens(normalized.length, config),
+            jsonResponseFormat: false,
+            systemPrompt: buildBodyFromImageSystemPrompt(normalized),
+            messages: [
               {
-                type: 'text',
-                text: buildBodyFromImageUserPrompt(normalized),
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: image.dataUrl,
-                },
+                role: 'user',
+                content: [
+                  {
+                    type: 'text',
+                    text: buildBodyFromImageUserPrompt(normalized, { retry: attempt > 1 }),
+                  },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: image.dataUrl,
+                    },
+                  },
+                ],
               },
             ],
-          },
-        ],
-      });
+          });
 
-    const rawBody = extractBodyForBodyFromImage(completion.parsed, completion.text);
-    const sanitized = stripBodyFromImageCoT(rawBody);
-    const body = validateBodyOutput(sanitized);
+          const rawBody = extractBodyForBodyFromImage(completion.parsed, completion.text);
+          const withoutCot = stripBodyFromImageCoT(rawBody);
+          const sanitized = sanitizeBodyFromImageLanguage(withoutCot, normalized.language);
+          const body = validateBodyOutput(sanitized);
 
-    return {
-      body,
-      model,
-    };
+          return {
+            body,
+            model,
+          };
+        } catch (error) {
+          lastError = error;
+          if (attempt >= maxAttempts) {
+            break;
+          }
+        }
+      }
+
+      throw lastError;
     },
 
     async proofreadFromText({ config, requestId, input }) {
@@ -699,47 +724,56 @@ export function buildBodyFromImageSystemPrompt(input) {
   const languageLabel = input.language === 'en' ? 'English' : 'Korean';
   if (input.language === 'ko') {
     return [
-      '당신은 비즈니스 어시스턴트입니다. 이미지를 분석하여 한국어로 핵심 내용을 요약하세요.',
+      '당신은 비즈니스 어시스턴트입니다. 이미지를 분석하여 한국어로 정확히 3줄만 요약하세요. 각 줄은 중간에 끊기지 않는 완결된 문장이어야 합니다. This is a factual 3-line summary task.',
       '반드시 하나의 JSON 객체로만 응답하세요. 키 이름은 "body"입니다.',
-      '- "body" 값은 반드시 이미지의 핵심 사실을 담은 3줄 요약이어야 합니다.',
+      '- "body" 값은 반드시 이미지의 핵심 사실만 담은 정확히 3줄이어야 합니다.',
+      '- 각 줄은 완결되어야 하며, 반드시 마침표로 끝나야 합니다. ":" "-" "..." 같은 미완성 표시로 끝나면 안 됩니다.',
       '- 줄 바꿈은 \\n을 사용하세요.',
       '- 생각의 흐름(thinking process), 분석 단계, 서론, 부연 설명은 절대 포함하지 마세요.',
       '- "Here\'s a thinking process"와 같은 문구로 시작하지 마세요.',
-      '- 오직 요약된 3줄의 텍스트만 "body" 값에 넣으세요.',
-      '- 반드시 한국어로만 작성하세요. 영어 문장을 쓰지 마세요.',
-      '- 만약 "body" 값이 비어있거나 "..."이면 실패로 간주합니다. 반드시 실제 내용을 작성하세요.',
+      '- 이미지에 글자가 많아도 3줄 안에서 가장 중요한 정보만 압축하고, 중간에서 잘라 쓰지 마세요.',
+      '- 기술명, 파일명, 코드명, 괄호 안 표기는 가능한 한 원문 그대로 유지하세요.',
+      '- 주요 설명은 한국어로 쓰되, 이미지 안의 기술 식별자는 번역하지 마세요.',
+      '- "body" 값이 비어있거나 placeholder이면 실패입니다. 반드시 이미지에 보이는 실제 내용을 작성하세요.',
       '- JSON 형식 예시: {"body": "첫 번째 사실\\n두 번째 사실\\n세 번째 사실"}',
-      '- 이미지에 텍스트가 많으면 가장 중요한 3가지만 골라 요약하세요.',
-    ].join('\n');
+    ].join('\\n');
   }
   return [
     `You are a business assistant. Analyze the image and provide a factual summary in ${languageLabel}.`,
     'Return exactly one JSON object with the key "body".',
-    '- The "body" value must be a 3-line factual summary of the image.',
+    '- The "body" value must be exactly 3 complete lines of factual summary.',
+    '- Each line must be complete and must end with sentence punctuation.',
     '- Use \\n for line breaks.',
     '- NO thinking process, NO analysis steps, NO introductory text.',
     '- DO NOT start with "Here\'s a thinking process".',
+    '- If the image text is dense, compress harder instead of adding more lines or cutting off mid-line.',
+    '- Preserve technical names, file names, and code names as-is whenever possible.',
     '- Example: {"body": "Fact 1\\nFact 2\\nFact 3"}',
-  ].join('\n');
+  ].join('\\n');
 }
 
 /** User: 과제·톤·힌트 */
-export function buildBodyFromImageUserPrompt(input) {
+export function buildBodyFromImageUserPrompt(input, options = {}) {
   const languageLabel = input.language === 'en' ? 'English' : 'Korean';
   const titleHint = input.titleHint ? `\n참고: ${input.titleHint}` : '';
   const tone = input.tone ? `\n톤: ${input.tone}` : '';
+  const retryHint = options.retry
+    ? '\n이전 응답이 비어있거나 중간에 잘렸습니다. 이번에는 이미지에 보이는 실제 텍스트를 더 짧고 완결된 3줄로 다시 작성하세요.'
+    : '';
 
   if (input.language === 'ko') {
     return [
-      `이미지 내용을 한국어로 3줄 요약하여 JSON {"body":"..."} 형식으로 출력하세요.${titleHint}${tone}`,
-      '다른 텍스트 없이 오직 JSON 객체 하나만 출력하세요. 반드시 한국어로만 작성하세요. 영어는 절대 사용하지 마세요. "..." 대신 실제 내용을 작성하세요.',
-    ].join('\n');
+      `이미지 내용을 한국어로 정확히 3줄 요약하여 JSON 객체로 출력하세요.${titleHint}${tone}${retryHint}`,
+      '각 줄은 중간에 끊기지 않는 완결된 문장이어야 합니다. 각 줄 끝에는 반드시 마침표를 붙이고, 3줄보다 적거나 많으면 안 됩니다.',
+      '이미지에 보이는 실제 텍스트를 우선하고, 기술명/파일명/코드명은 가능한 한 그대로 유지하세요.',
+    ].join('\\n');
   }
 
   return [
-    `Summarize this image in exactly 3 lines (${languageLabel}) and output as JSON.${titleHint}${tone}`,
-    'Output ONLY the JSON: {"body":"..."}. No other text. Do not use "..." in the output.',
-  ].join('\n');
+    `Summarize this image in exactly 3 complete lines (${languageLabel}) and output one JSON object.${titleHint}${tone}${retryHint}`,
+    'Each line must be complete. End each line with a period. Do not cut off mid-line, and do not add extra lines or placeholders.',
+    'Preserve actual on-image text, including technical names, file names, and code names whenever possible.',
+  ].join('\\n');
 }
 
 /** 테스트·문서 호환 */
@@ -922,11 +956,48 @@ export function validateProofreadOutput(raw) {
 }
 
 export function validateBodyOutput(raw) {
-  const body = asString(raw).trim();
-  if (!body) {
+  const body = asString(raw).trim().replace(/\r\n/g, '\n');
+  const lines = body.split('\n').map((line) => line.trim()).filter(Boolean);
+  const compact = body.replace(/[\s"\'`{}:body\uFEFF]/gi, '');
+  if (!body || compact === '...' || compact === '…' || /^[.…-]+$/.test(compact)) {
     throw new InternalApiError(422, 'Model did not produce a valid body.', 'INVALID_BODY_OUTPUT');
   }
-  return body;
+
+  const collected = [];
+  let current = '';
+  for (const line of lines) {
+    current = current ? `${current} ${line}`.replace(/\s+/g, ' ').trim() : line;
+    if (!isIncompleteBodyLine(current)) {
+      collected.push(current);
+      current = '';
+      if (collected.length === 3) {
+        break;
+      }
+    }
+  }
+
+  if (collected.length < 3) {
+    throw new InternalApiError(422, 'Model did not produce a valid body.', 'INVALID_BODY_OUTPUT', {
+      reason: 'LINE_COUNT_TOO_SHORT',
+      stats: { lineCount: lines.length, bytes: body.length },
+    });
+  }
+
+  return collected.slice(0, 3).join('\n');
+}
+
+function isIncompleteBodyLine(line) {
+  const trimmed = asString(line).replace(/\s+/g, ' ').trim();
+  if (!trimmed) {
+    return true;
+  }
+  if (/[:：\-–—…]$/.test(trimmed)) {
+    return true;
+  }
+  if (/^[\-*•]+$/.test(trimmed)) {
+    return true;
+  }
+  return !(/[.!?。！？)\]\}'"”’]$/.test(trimmed));
 }
 
 function normalizeLanguage(value) {
@@ -1103,9 +1174,9 @@ function normalizePriority(value) {
 }
 
 function bodyMaxTokens(length, config) {
-  const shortCap = config?.contentBodyMaxTokensShort ?? 320;
-  const mediumCap = config?.contentBodyMaxTokensMedium ?? 512;
-  const longCap = config?.contentBodyMaxTokensLong ?? 768;
+  const shortCap = Math.max(config?.contentBodyMaxTokensShort ?? 320, 448);
+  const mediumCap = Math.max(config?.contentBodyMaxTokensMedium ?? 512, 640);
+  const longCap = Math.max(config?.contentBodyMaxTokensLong ?? 768, 896);
   if (length === 'short') {
     return shortCap;
   }
